@@ -9,29 +9,38 @@ import {
   UserPlus, KeyRound, Eye, EyeOff, UserCheck, Star, RotateCcw, Users, Database, Globe
 } from 'lucide-react';
 
+import { initializeApp } from 'firebase/app';
+import { 
+  getFirestore, collection, onSnapshot, doc, 
+  setDoc, deleteDoc, addDoc, query 
+} from 'firebase/firestore';
+import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
+
 // ==========================================
-// 1. DATA INITIAL & KONSTANTA
+// 1. KONFIGURASI FIREBASE & INITIAL DATA
 // ==========================================
+const firebaseConfig = JSON.parse(__firebase_config);
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'sikopifasta-v4';
+
 const INITIAL_DATA = [];
 
+// Mempertahankan 1 Akun Master Admin agar sistem tidak terkunci
 const INITIAL_USERS = [
   {
-    id: 100, nama: 'ADMIN UTAMA', nip: '198801012010011001', 
-    email: 'admin@sikopifasta.go.id', whatsapp: '081234567890', username: 'admin',
-    password: 'password123', role: 'admin', historyTerlambat: 0, historyRusak: 0,
+    id: 'admin-master', 
+    nama: 'ADMIN UTAMA', 
+    nip: '198801012010011001', 
+    email: 'admin@sikopifasta.go.id', 
+    whatsapp: '081234567890', 
+    username: 'admin',
+    password: 'password123', 
+    role: 'admin', 
+    historyTerlambat: 0, 
+    historyRusak: 0,
     foto: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop'
-  },
-  {
-    id: 101, nama: 'SITI AMINAH', nip: '199205102015032001',
-    email: 'siti@sikopifasta.go.id', whatsapp: '085223344556', username: 'siti.a',
-    password: 'password123', role: 'user', historyTerlambat: 0, historyRusak: 0,
-    foto: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=400&fit=crop'
-  },
-  {
-    id: 102, nama: 'DIKI HERMAWAN', nip: '199512122018011005',
-    email: 'diki@sikopifasta.go.id', whatsapp: '081399887766', username: 'diki.h',
-    password: 'password123', role: 'user', historyTerlambat: 2, historyRusak: 1,
-    foto: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&h=400&fit=crop'
   }
 ];
 
@@ -63,9 +72,37 @@ export default function App() {
   const [users, setUsers] = useState(INITIAL_USERS);
   const [appSettings, setAppSettings] = useState(INITIAL_SETTINGS);
   const [currentUser, setCurrentUser] = useState(null);
+  const [firebaseUser, setFirebaseUser] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [notification, setNotification] = useState(null);
 
+  // Auth Lifecycle
+  useEffect(() => {
+    const initAuth = async () => {
+      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+        await signInWithCustomToken(auth, __initial_auth_token);
+      } else {
+        await signInAnonymously(auth);
+      }
+    };
+    initAuth();
+    const unsubscribe = onAuthStateChanged(auth, setFirebaseUser);
+    return () => unsubscribe();
+  }, []);
+
+  // Firestore Real-time Sync for Users
+  useEffect(() => {
+    if (!firebaseUser) return;
+    const usersCol = collection(db, 'artifacts', appId, 'public', 'data', 'users');
+    const unsubscribe = onSnapshot(usersCol, (snapshot) => {
+      const usersFromDb = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+      // Gabungkan Master Admin dengan User dari Database
+      setUsers([...INITIAL_USERS, ...usersFromDb.filter(u => u.username !== 'admin')]);
+    }, (err) => console.error("Firestore Users Error:", err));
+    return () => unsubscribe();
+  }, [firebaseUser]);
+
+  // Muat pustaka XLSX
   useEffect(() => {
     const script = document.createElement('script');
     script.src = "https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js";
@@ -77,19 +114,16 @@ export default function App() {
     };
   }, []);
 
+  // Logika Sinkronisasi Data Otomatis dari Spreadsheet
   useEffect(() => {
     const fetchDataFromSheet = async (url, categoryLabel, prefix) => {
-      if (!url || url.trim() === '') {
-        setData(prev => prev.filter(item => item.kategori !== categoryLabel));
-        return;
-      }
+      if (!url || url.trim() === '' || typeof window.XLSX === 'undefined') return;
 
       try {
         const sheetIdMatch = url.match(/\/d\/([^/]+)/);
-        if (sheetIdMatch && typeof window.XLSX !== 'undefined') {
+        if (sheetIdMatch) {
           const sheetId = sheetIdMatch[1];
           const exportUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=xlsx`;
-          
           const response = await fetch(exportUrl);
           if (!response.ok) throw new Error("Gagal akses spreadsheet");
           
@@ -99,19 +133,32 @@ export default function App() {
           const worksheet = workbook.Sheets[firstSheetName];
           const jsonData = window.XLSX.utils.sheet_to_json(worksheet);
           
-          const mappedData = jsonData.map((item, index) => ({
-            ...item,
-            id: item.id || `fetched-${prefix}-${index}`,
-            kategori: categoryLabel,
-            status: item.status || 'Tersedia'
-          }));
-
-          setData(prev => [
-            ...prev.filter(i => i.kategori !== categoryLabel),
-            ...mappedData
-          ]);
-          
-          showNotification(`Database ${categoryLabel} Berhasil Disinkronkan!`);
+          if (categoryLabel === 'Users') {
+            for (const item of jsonData) {
+              const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', item.username || `user-${Date.now()}`);
+              await setDoc(userRef, {
+                ...item,
+                nama: (item.nama || '').toUpperCase(),
+                role: item.role || 'user',
+                historyTerlambat: item.historyTerlambat || 0,
+                historyRusak: item.historyRusak || 0,
+                password: item.password || 'password123'
+              }, { merge: true });
+            }
+            showNotification(`Database Pengguna Berhasil Diimpor!`);
+          } else {
+            const mappedData = jsonData.map((item, index) => ({
+              ...item,
+              id: item.id || `fetched-${prefix}-${index}`,
+              kategori: categoryLabel,
+              status: item.status || 'Tersedia'
+            }));
+            setData(prev => [
+              ...prev.filter(i => i.kategori !== categoryLabel),
+              ...mappedData
+            ]);
+            showNotification(`Database ${categoryLabel} Berhasil Disinkronkan!`);
+          }
         }
       } catch (error) {
         showNotification(`Gagal memuat database ${categoryLabel}. Periksa link & akses.`);
@@ -122,10 +169,11 @@ export default function App() {
       fetchDataFromSheet(appSettings.linkDbKendaraan, 'Kendaraan Dinas', 'v');
       fetchDataFromSheet(appSettings.linkDbElektronik, 'Peralatan Elektronik', 'e');
       fetchDataFromSheet(appSettings.linkDbBarangLain, 'Barang Lain', 'b');
-    }, 1000);
+      fetchDataFromSheet(appSettings.linkDbUsers, 'Users', 'u');
+    }, 1500);
 
     return () => clearTimeout(timer);
-  }, [appSettings.linkDbKendaraan, appSettings.linkDbElektronik, appSettings.linkDbBarangLain]);
+  }, [appSettings.linkDbKendaraan, appSettings.linkDbElektronik, appSettings.linkDbBarangLain, appSettings.linkDbUsers]);
 
   const showNotification = (msg) => {
     setNotification(msg);
@@ -243,7 +291,7 @@ function Footer() {
       <div className="max-w-6xl mx-auto px-4 flex flex-col items-center">
         <div className="flex items-center gap-2 mb-4 text-gray-300">
            <ShieldCheck size={16} />
-           <span className="font-black tracking-[0.2em] text-[10px] uppercase italic">SIKOPIFASTA Enterprise v4.4</span>
+           <span className="font-black tracking-[0.2em] text-[10px] uppercase italic">SIKOPIFASTA Enterprise v4.5</span>
         </div>
         <p className="text-gray-400 text-sm font-bold text-center italic leading-relaxed">
           "Sistem Kontrol Pinjam Fasilitas dan Inventaris Terpadu" <br/>
@@ -439,7 +487,7 @@ function RegistrationPortal({ setView, users, setUsers, showNotification }) {
   const [formData, setFormData] = useState({ nama: '', nip: '', username: '', email: '', whatsapp: '', password: '', confirmPassword: '' });
   const [showPass, setShowPass] = useState(false);
 
-  const handleRegister = (e) => {
+  const handleRegister = async (e) => {
     e.preventDefault();
     if (!/^\d+$/.test(formData.whatsapp) || !formData.whatsapp.startsWith('0')) { showNotification("WA harus angka dan diawali 0."); return; }
     if (!/^\d+$/.test(formData.nip)) { showNotification("NIP harus numerik (0 jika tdk ada)."); return; }
@@ -447,10 +495,25 @@ function RegistrationPortal({ setView, users, setUsers, showNotification }) {
     if (formData.password !== formData.confirmPassword) { showNotification("Konfirmasi sandi tidak cocok."); return; }
     if (users.some(u => u.username === formData.username || u.email === formData.email || (formData.nip !== "0" && u.nip === formData.nip))) { showNotification("Data identitas sudah terdaftar."); return; }
     
-    const newUser = { ...formData, nama: formData.nama.toUpperCase(), role: 'user', historyTerlambat: 0, historyRusak: 0, id: Date.now(), foto: null };
-    setUsers([...users, newUser]);
-    showNotification("Selamat! Registrasi Berhasil. Silakan Login.");
-    setView('login_portal');
+    try {
+      const newUser = { 
+        ...formData, 
+        nama: formData.nama.toUpperCase(), 
+        role: 'user', 
+        historyTerlambat: 0, 
+        historyRusak: 0, 
+        id: Date.now().toString(), 
+        foto: null 
+      };
+      // Sync to Firestore
+      const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', newUser.username);
+      await setDoc(userRef, newUser);
+      
+      showNotification("Selamat! Registrasi Berhasil. Silakan Login.");
+      setView('login_portal');
+    } catch (err) {
+      showNotification("Gagal registrasi. Coba lagi nanti.");
+    }
   };
 
   return (
@@ -525,7 +588,7 @@ function AdminPanel({ data, setData, users, setUsers, appSettings, setAppSetting
   const [editingItem, setEditingItem] = useState(null);
   const [selectedDetailItem, setSelectedDetailItem] = useState(null);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
-  const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false); // Modal tambah user
+  const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false); 
   const [editingUser, setEditingUser] = useState(null);
   const fileInputRef = useRef(null);
 
@@ -561,16 +624,23 @@ function AdminPanel({ data, setData, users, setUsers, appSettings, setAppSetting
     closeModal();
   };
 
-  const handleEditUser = (e) => {
+  // CRUD Pengguna dengan Firestore Sync
+  const handleEditUser = async (e) => {
     e.preventDefault();
-    setUsers(users.map(u => u.id === editingUser.id ? { ...userFormData, id: u.id, role: u.role, historyRusak: u.historyRusak, historyTerlambat: u.historyTerlambat } : u));
-    showNotification("Data profil pengguna berhasil diperbarui!");
-    setIsUserModalOpen(false);
+    try {
+      const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', editingUser.username);
+      await setDoc(userRef, { 
+        ...editingUser, 
+        ...userFormData, 
+        nama: userFormData.nama.toUpperCase() 
+      }, { merge: true });
+      showNotification("Data profil pengguna berhasil diperbarui!");
+      setIsUserModalOpen(false);
+    } catch (err) { showNotification("Gagal memperbarui data."); }
   };
 
-  const handleAddUserSubmit = (e) => {
+  const handleAddUserSubmit = async (e) => {
     e.preventDefault();
-    // Validasi
     if (!/^\d+$/.test(addUserFormData.whatsapp) || !addUserFormData.whatsapp.startsWith('0')) { 
       showNotification("WhatsApp harus angka dan diawali 0."); return; 
     }
@@ -578,33 +648,44 @@ function AdminPanel({ data, setData, users, setUsers, appSettings, setAppSetting
       showNotification("NIP harus numerik (0 jika tidak ada)."); return; 
     }
     if (users.some(u => u.username === addUserFormData.username || u.email === addUserFormData.email || (addUserFormData.nip !== "0" && u.nip === addUserFormData.nip))) { 
-      showNotification("Username, Email, atau NIP sudah terdaftar."); return; 
+      showNotification("Identitas (Username/Email/NIP) sudah terdaftar."); return; 
     }
 
-    const newUser = {
-      ...addUserFormData,
-      id: Date.now(),
-      password: 'password123', // Password default
-      role: 'user',
-      historyTerlambat: 0,
-      historyRusak: 0,
-      foto: null
-    };
-
-    setUsers([...users, newUser]);
-    setIsAddUserModalOpen(false);
-    setAddUserFormData({ nama: '', nip: '', email: '', whatsapp: '', username: '' });
-    showNotification(`Pengguna ${newUser.nama} berhasil ditambahkan!`);
+    try {
+      const newUser = {
+        ...addUserFormData,
+        id: Date.now().toString(),
+        password: 'password123',
+        role: 'user',
+        historyTerlambat: 0,
+        historyRusak: 0,
+        foto: null,
+        nama: addUserFormData.nama.toUpperCase()
+      };
+      
+      const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', newUser.username);
+      await setDoc(userRef, newUser);
+      
+      setIsAddUserModalOpen(false);
+      setAddUserFormData({ nama: '', nip: '', email: '', whatsapp: '', username: '' });
+      showNotification(`Pengguna ${newUser.nama} berhasil ditambahkan!`);
+    } catch (err) { showNotification("Gagal menambah pengguna."); }
   };
 
-  const resetUserPassword = (userId) => {
-    setUsers(users.map(u => u.id === userId ? { ...u, password: 'password123' } : u));
-    showNotification("Sandi pengguna telah direset ke default.");
+  const resetUserPassword = async (username) => {
+    try {
+      const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', username);
+      await setDoc(userRef, { password: 'password123' }, { merge: true });
+      showNotification("Sandi pengguna telah direset ke default.");
+    } catch (err) { showNotification("Gagal reset sandi."); }
   };
 
-  const deleteUser = (userId) => {
-    setUsers(users.filter(u => u.id !== userId));
-    showNotification("Akun pengguna telah dihapus permanen.");
+  const deleteUser = async (username) => {
+    try {
+      const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', username);
+      await deleteDoc(userRef);
+      showNotification("Akun pengguna telah dihapus permanen.");
+    } catch (err) { showNotification("Gagal menghapus akun."); }
   };
 
   const openModal = (item = null) => {
@@ -670,9 +751,9 @@ function AdminPanel({ data, setData, users, setUsers, appSettings, setAppSetting
         <AdminUsersSection 
           users={users} data={data} 
           userSearch={userSearch} setUserSearch={setUserSearch}
-          onAddClick={() => setIsAddUserModalOpen(true)} // Trigger modal tambah
+          onAddClick={() => setIsAddUserModalOpen(true)} 
           onEdit={(u) => { setEditingUser(u); setUserFormData({nama: u.nama, nip: u.nip, email: u.email, whatsapp: u.whatsapp, username: u.username, password: u.password}); setIsUserModalOpen(true); }} 
-          onReset={resetUserPassword} onDelete={deleteUser} 
+          onReset={(u) => resetUserPassword(u.username)} onDelete={(u) => deleteUser(u.username)} 
         />
       ) : adminSubView === 'profile' ? (
         <AdminProfileSection adminProfile={adminProfile} setAdminProfile={setAdminProfile} showNotification={showNotification} />
@@ -709,7 +790,7 @@ function AdminPanel({ data, setData, users, setUsers, appSettings, setAppSetting
                 </div>
               </div>
               <div>
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Email Kantor (abc@gmail.com)</label>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Email Kantor (format: abc@mail.com)</label>
                 <input type="email" required value={addUserFormData.email} onChange={e => setAddUserFormData({...addUserFormData, email: e.target.value})} className="w-full px-5 py-3.5 bg-gray-50 border-none rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold" placeholder="nama@mail.com" />
               </div>
               <div>
@@ -812,7 +893,6 @@ function AdminUsersSection({ users, data, userSearch, setUserSearch, onAddClick,
   const getUserBorrowInfo = (username) => data.find(item => item.status === 'Dipinjam' && (item.usernamePeminjam === username || item.peminjam === username));
 
   const filteredSortedUsers = users
-    .filter(u => u.role !== 'admin')
     .filter(u => {
       const borrow = getUserBorrowInfo(u.username);
       const searchString = userSearch.toLowerCase();
@@ -849,7 +929,8 @@ function AdminUsersSection({ users, data, userSearch, setUserSearch, onAddClick,
 
       <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-left text-sm min-w-[1200px]"><thead className="bg-gray-50/50 border-b border-gray-100"><tr><th className="px-6 py-5 font-black text-gray-400 uppercase tracking-widest">Pengguna</th><th className="px-6 py-5 font-black text-gray-400 uppercase tracking-widest">Identitas NIP</th><th className="px-6 py-5 font-black text-gray-400 uppercase tracking-widest">Pinjaman Aktif</th><th className="px-6 py-5 font-black text-gray-400 uppercase tracking-widest">Jatuh Tempo</th><th className="px-6 py-5 font-black text-gray-400 uppercase tracking-widest text-center">Rating</th><th className="px-6 py-5 font-black text-gray-400 uppercase tracking-widest text-right">Aksi Akun</th></tr></thead><tbody className="divide-y divide-gray-50">{filteredSortedUsers.map(u => {
         const borrow = getUserBorrowInfo(u.username); const rating = calculateRating(u.historyTerlambat, u.historyRusak); const isVBad = rating === 1;
-        return (<tr key={u.id} className={`transition-all ${isVBad ? 'bg-red-50 hover:bg-red-100/50' : 'hover:bg-indigo-50/20'}`}><td className="px-6 py-5"><div className="flex items-center gap-4"><div className="w-12 h-12 rounded-full bg-gray-100 border border-gray-200 overflow-hidden shrink-0 shadow-inner">{u.foto ? <img src={u.foto} alt="P" className="w-full h-full object-cover" /> : <UserCircle size={28} className="mx-auto mt-2 text-gray-300" />}</div><div><p className="font-black text-gray-900 leading-tight uppercase mb-0.5">{u.nama}</p><p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">@{u.username}</p></div></div></td><td className="px-6 py-5"><p className="text-[10px] font-black text-indigo-400 tracking-widest uppercase">NIP: {u.nip}</p></td><td className="px-6 py-5">{borrow ? (<div className="flex items-center gap-2 text-indigo-600 bg-indigo-50 px-4 py-2 rounded-xl font-black uppercase border border-indigo-100 w-max"><Package size={16} /><span>{borrow.nama}</span></div>) : <span className="text-gray-300 italic font-medium">Nihil</span>}</td><td className="px-6 py-5 font-black">{borrow ? (<div className={`flex items-center gap-1.5 ${borrow.tglKembali === new Date().toISOString().split('T')[0] ? 'text-red-600 animate-pulse' : 'text-gray-600'}`}><Clock size={16} />{borrow.tglKembali}</div>) : "-"}</td><td className="px-6 py-5"><div className="flex flex-col items-center"><div className="flex gap-1">{[1,2,3,4,5].map(s => (<Star key={s} size={16} fill={s <= rating ? (isVBad ? "#ef4444" : "#f59e0b") : "none"} stroke={s <= rating ? (isVBad ? "#ef4444" : "#f59e0b") : "#d1d5db"} />))}</div><p className={`text-[9px] font-black mt-2 uppercase tracking-widest ${isVBad ? 'text-red-600' : 'text-gray-400'}`}>L: {u.historyTerlambat} | R: {u.historyRusak}</p></div></td><td className="px-6 py-5 text-right"><div className="flex items-center justify-end gap-1.5"><button onClick={() => onReset(u.id)} className="p-2.5 text-amber-500 hover:bg-amber-50 rounded-xl transition-all border border-transparent hover:border-amber-100" title="Reset Password"><RotateCcw size={20}/></button><button onClick={() => onEdit(u)} className="p-2.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all border border-transparent hover:border-indigo-100"><Edit size={20}/></button><button onClick={() => onDelete(u.id)} className="p-2.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all border border-transparent hover:border-red-100"><Trash2 size={20}/></button></div></td></tr>);
+        const isMaster = u.username === 'admin';
+        return (<tr key={u.id} className={`transition-all ${isVBad ? 'bg-red-50 hover:bg-red-100/50' : 'hover:bg-indigo-50/20'}`}><td className="px-6 py-5"><div className="flex items-center gap-4"><div className="w-12 h-12 rounded-full bg-gray-100 border border-gray-200 overflow-hidden shrink-0 shadow-inner">{u.foto ? <img src={u.foto} alt="P" className="w-full h-full object-cover" /> : <UserCircle size={28} className="mx-auto mt-2 text-gray-300" />}</div><div><p className="font-black text-gray-900 leading-tight uppercase mb-0.5">{u.nama} {isMaster && <span className="text-[8px] bg-indigo-600 text-white px-1.5 py-0.5 rounded-full ml-1">MASTER</span>}</p><p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">@{u.username}</p></div></div></td><td className="px-6 py-5"><p className="text-[10px] font-black text-indigo-400 tracking-widest uppercase">NIP: {u.nip}</p></td><td className="px-6 py-5">{borrow ? (<div className="flex items-center gap-2 text-indigo-600 bg-indigo-50 px-4 py-2 rounded-xl font-black uppercase border border-indigo-100 w-max"><Package size={16} /><span>{borrow.nama}</span></div>) : <span className="text-gray-300 italic font-medium">Nihil</span>}</td><td className="px-6 py-5 font-black">{borrow ? (<div className={`flex items-center gap-1.5 ${borrow.tglKembali === new Date().toISOString().split('T')[0] ? 'text-red-600 animate-pulse' : 'text-gray-600'}`}><Clock size={16} />{borrow.tglKembali}</div>) : "-"}</td><td className="px-6 py-5"><div className="flex flex-col items-center"><div className="flex gap-1">{[1,2,3,4,5].map(s => (<Star key={s} size={16} fill={s <= rating ? (isVBad ? "#ef4444" : "#f59e0b") : "none"} stroke={s <= rating ? (isVBad ? "#ef4444" : "#f59e0b") : "#d1d5db"} />))}</div><p className={`text-[9px] font-black mt-2 uppercase tracking-widest ${isVBad ? 'text-red-600' : 'text-gray-400'}`}>L: {u.historyTerlambat} | R: {u.historyRusak}</p></div></td><td className="px-6 py-5 text-right"><div className="flex items-center justify-end gap-1.5"><button onClick={() => onReset(u)} className="p-2.5 text-amber-500 hover:bg-amber-50 rounded-xl transition-all border border-transparent hover:border-amber-100" title="Reset Password"><RotateCcw size={20}/></button><button onClick={() => onEdit(u)} className="p-2.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all border border-transparent hover:border-indigo-100"><Edit size={20}/></button><button onClick={() => !isMaster && onDelete(u)} className={`p-2.5 rounded-xl transition-all border border-transparent ${isMaster ? 'text-gray-200 cursor-not-allowed' : 'text-gray-400 hover:text-red-600 hover:bg-red-50 hover:border-red-100'}`} disabled={isMaster}><Trash2 size={20}/></button></div></td></tr>);
       })}</tbody></table></div></div>
     </div>
   );
@@ -893,7 +974,7 @@ function AppSettingsSection({ appSettings, setAppSettings, showNotification }) {
               <h4 className="text-xs font-black text-indigo-400 uppercase tracking-[0.2em] flex items-center gap-2">
                 <Globe size={14} /> Link Spreadsheet / Google Drive
               </h4>
-              <p className="text-xs text-gray-400 font-medium italic">Masukkan URL Spreadsheet master inventaris (Pastikan akses disetel ke "Siapa saja dengan link").</p>
+              <p className="text-xs text-gray-400 font-medium italic">Masukkan URL Spreadsheet master (Pastikan akses disetel ke "Siapa saja dengan link").</p>
             </div>
 
             <div className="space-y-6">
@@ -930,13 +1011,13 @@ function AppSettingsSection({ appSettings, setAppSettings, showNotification }) {
                 />
               </div>
 
-              <div className="space-y-2 pt-4 border-t border-gray-50 opacity-60">
-                <label className="text-xs font-black text-emerald-600 uppercase tracking-widest ml-1">Database Akun Pengguna</label>
+              <div className="space-y-2 pt-4 border-t border-gray-50">
+                <label className="text-xs font-black text-emerald-600 uppercase tracking-widest ml-1">Database Akun Pengguna (Sinkronisasi Excel)</label>
                 <input 
                   type="url" 
                   value={appSettings.linkDbUsers} 
                   onChange={e => setAppSettings({...appSettings, linkDbUsers: e.target.value})} 
-                  className="w-full px-5 py-4 bg-emerald-50/50 rounded-2xl outline-none font-bold text-gray-600 shadow-inner" 
+                  className="w-full px-5 py-4 bg-emerald-50/50 border border-emerald-100 rounded-2xl outline-none font-bold text-gray-600 shadow-inner" 
                   placeholder="https://docs.google.com/spreadsheets/d/..."
                 />
               </div>
@@ -1005,7 +1086,7 @@ function AssetDetailModal({ selectedDetailItem, closeDetailModal }) {
                 ) : (
                   <div className={`${themeColor} text-white px-4 py-1 rounded-lg font-mono font-bold text-sm tracking-tight`}>{selectedDetailItem.nup || '-'}</div>
                 )}
-                <span className={`px-4 py-1.5 rounded-lg text-xs font-black uppercase ${selectedDetailItem.status === 'Tersedia' ? 'bg-green-500 text-white' : selectedDetailItem.status === 'Dipinjam' ? 'bg-orange-500 text-white' : 'bg-red-500 text-white'}`}>{selectedDetailItem.status}</span>
+                <span className={`px-4 py-1.5 rounded-lg text-xs font-black uppercase ${selectedDetailItem.status === 'Tersedia' ? 'bg-green-500 text-white' : selectedDetailItem.status === 'Dipinjam' ? 'bg-orange-50 text-orange-700 border-orange-100' : 'bg-red-50 text-red-700 border-red-100'}`}>{selectedDetailItem.status}</span>
               </div>
             </div>
             {isVehicle && (

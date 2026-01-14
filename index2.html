@@ -1,0 +1,945 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  Home, LogIn, Car, Laptop, Package, Download, ArrowLeft,
+  ChevronRight, Search, Info, CheckCircle2, AlertCircle,
+  Plus, Edit, Trash2, User, Settings, LogOut, Camera,
+  Save, X, ShieldCheck, LayoutGrid, ListFilter, Calendar,
+  Gauge, ClipboardList, FileText, Wrench, Hash, Tag, Cpu, 
+  UserCircle, Filter, Boxes, Lock, Mail, Phone, Upload, Clock,
+  UserPlus, KeyRound, Eye, EyeOff, UserCheck, Star, RotateCcw, Users, Database, Globe
+} from 'lucide-react';
+
+// ==========================================
+// 1. DATA INITIAL & KONSTANTA
+// ==========================================
+const INITIAL_DATA = [
+  { 
+    id: 1, nama: 'Toyota Avanza', kategori: 'Kendaraan Dinas', status: 'Tersedia', 
+    noPlat: 'B 1234 ABC', noRangka: 'MHF12345678901234', noMesin: '2NR-FE123456',
+    kilometer: '15.420', tglOliMesin: '2023-12-01', tglOliMesinNext: '2024-06-01',
+    tglOliPerseneling: '2023-10-15', tglOliPersenelingNext: '2024-10-15',
+    tglPajak: '2024-11-20', deskripsiRusak: '', peminjam: '', usernamePeminjam: '', tglPinjam: '', tglKembali: ''
+  },
+  { 
+    id: 2, nama: 'Bus Operasional', kategori: 'Kendaraan Dinas', status: 'Dipinjam', 
+    noPlat: 'B 7001 YZ', noRangka: 'MHF987654321', noMesin: 'BUS-999',
+    kilometer: '45.000', tglOliMesin: '2023-11-01', tglOliMesinNext: '2024-05-01',
+    tglOliPerseneling: '2023-09-15', tglOliPersenelingNext: '2024-09-15',
+    tglPajak: '2025-01-10', peminjam: 'DIKI HERMAWAN', usernamePeminjam: 'diki.h', tglPinjam: '2024-01-10', tglKembali: new Date().toISOString().split('T')[0]
+  },
+  { 
+    id: 3, nama: 'Laptop/PC', kategori: 'Peralatan Elektronik', status: 'Tersedia', 
+    nup: 'ELK-001-2024', merek: 'Apple', spek: 'MacBook Pro M2, 16GB RAM, 512GB SSD', 
+    deskripsiRusak: '', peminjam: '', usernamePeminjam: '', tglPinjam: '', tglKembali: ''
+  },
+  { 
+    id: 4, nama: 'Printer', kategori: 'Peralatan Elektronik', status: 'Dipinjam', 
+    nup: 'PRN-002-2024', merek: 'Epson', spek: 'L3210 All-in-One', 
+    peminjam: 'SITI AMINAH', usernamePeminjam: 'siti.a', tglPinjam: '2024-01-12', tglKembali: '2024-12-25'
+  },
+  { 
+    id: 5, nama: 'Tenda Dome Kapasitas 4', kategori: 'Barang Lain', status: 'Tersedia', 
+    nup: 'LNN-001-2024', merek: 'Great Outdoor', spek: 'Double Layer, Frame Alloy', 
+    peminjam: '', usernamePeminjam: '', tglPinjam: '', tglKembali: '', deskripsiRusak: '' 
+  },
+];
+
+const INITIAL_USERS = [
+  {
+    id: 100, nama: 'ADMIN UTAMA', nip: '198801012010011001', 
+    email: 'admin@sikopifasta.go.id', whatsapp: '081234567890', username: 'admin',
+    password: 'password123', role: 'admin', historyTerlambat: 0, historyRusak: 0,
+    foto: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop'
+  },
+  {
+    id: 101, nama: 'SITI AMINAH', nip: '199205102015032001',
+    email: 'siti@sikopifasta.go.id', whatsapp: '085223344556', username: 'siti.a',
+    password: 'password123', role: 'user', historyTerlambat: 0, historyRusak: 0,
+    foto: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=400&fit=crop'
+  },
+  {
+    id: 102, nama: 'DIKI HERMAWAN', nip: '199512122018011005',
+    email: 'diki@sikopifasta.go.id', whatsapp: '081399887766', username: 'diki.h',
+    password: 'password123', role: 'user', historyTerlambat: 2, historyRusak: 1,
+    foto: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&h=400&fit=crop'
+  }
+];
+
+const CATEGORIES = [
+  { id: 'Kendaraan Dinas', icon: <Car size={40} />, color: 'bg-indigo-600', hover: 'hover:bg-indigo-700' },
+  { id: 'Peralatan Elektronik', icon: <Laptop size={40} />, color: 'bg-emerald-600', hover: 'hover:bg-emerald-700' },
+  { id: 'Barang Lain', icon: <Package size={40} />, color: 'bg-amber-600', hover: 'hover:bg-amber-700' }
+];
+
+const ELEKTRONIK_OPTIONS = [
+  "Laptop/PC", "Kabel Gulung", "Televisi", "Kulkas", "Dispenser", 
+  "Printer", "Keyboard", "Mouse", "Proyektor", "Microphone", 
+  "Headphone", "Speaker", "Papan Interaktif Digital (PID)", "Kamera", "Drone"
+];
+
+const INITIAL_SETTINGS = {
+  linkDbKendaraan: '',
+  linkDbElektronik: '',
+  linkDbBarangLain: '',
+  linkDbUsers: ''
+};
+
+// ==========================================
+// 2. KOMPONEN UTAMA
+// ==========================================
+export default function App() {
+  const [view, setView] = useState('user_dashboard'); 
+  const [data, setData] = useState(INITIAL_DATA);
+  const [users, setUsers] = useState(INITIAL_USERS);
+  const [appSettings, setAppSettings] = useState(INITIAL_SETTINGS);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [notification, setNotification] = useState(null);
+
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = "https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js";
+    script.async = true;
+    document.body.appendChild(script);
+    return () => {
+      const existingScript = document.querySelector(`script[src="${script.src}"]`);
+      if (existingScript) document.body.removeChild(existingScript);
+    };
+  }, []);
+
+  const showNotification = (msg) => {
+    setNotification(msg);
+    setTimeout(() => setNotification(null), 3000);
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setView('user_dashboard');
+    showNotification("Berhasil keluar sistem.");
+  };
+
+  const exportToExcel = (category = null) => {
+    if (typeof window.XLSX === 'undefined') {
+      showNotification("Pustaka Excel sedang dimuat...");
+      return;
+    }
+    try {
+      const dataToExport = category ? data.filter(item => item.kategori === category) : data;
+      const ws = window.XLSX.utils.json_to_sheet(dataToExport);
+      const wb = window.XLSX.utils.book_new();
+      window.XLSX.utils.book_append_sheet(wb, ws, "Inventaris");
+      const dateStr = new Date().toLocaleDateString('id-ID').replace(/\//g, '-');
+      const filename = category ? `${category.replace(/\s+/g, '_')}_${dateStr}.xlsx` : `Database_Full_SIKOPIFASTA_${dateStr}.xlsx`;
+      window.XLSX.writeFile(wb, filename);
+      showNotification(`Berhasil mengunduh data ${category || 'Lengkap'}!`);
+    } catch (err) {
+      showNotification("Gagal mengekspor data.");
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 text-gray-900 font-sans flex flex-col selection:bg-indigo-100 selection:text-indigo-900">
+      <style>{`
+          @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+          body { font-family: 'Plus Jakarta Sans', sans-serif; overflow-x: hidden; }
+          .animate-in { animation: fadeIn 0.4s ease-out; }
+          @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+      `}</style>
+      
+      <Header view={view} setView={setView} currentUser={currentUser} onLogout={handleLogout} setSelectedCategory={setSelectedCategory} />
+      
+      <main className="pb-20 flex-grow">
+        {view === 'user_dashboard' && <UserDashboard setView={setView} setSelectedCategory={setSelectedCategory} exportToExcel={() => exportToExcel()} />}
+        {view === 'category_detail' && <CategoryDetail selectedCategory={selectedCategory} setView={setView} data={data} />}
+        {view === 'login_portal' && <LoginPortal setView={setView} users={users} setCurrentUser={setCurrentUser} showNotification={showNotification} />}
+        {view === 'registration_portal' && <RegistrationPortal setView={setView} users={users} setUsers={setUsers} showNotification={showNotification} />}
+        {view === 'admin_panel' && currentUser?.role === 'admin' && (
+          <AdminPanel 
+            data={data} setData={setData} 
+            users={users} setUsers={setUsers} 
+            appSettings={appSettings} setAppSettings={setAppSettings}
+            adminProfile={currentUser} setAdminProfile={setCurrentUser} 
+            showNotification={showNotification} setView={setView} 
+            exportCategoryExcel={exportToExcel} 
+          />
+        )}
+        {view === 'user_panel' && currentUser?.role === 'user' && (
+          <div className="max-w-6xl mx-auto p-8 text-center mt-20 animate-in">
+             <UserCircle size={80} className="mx-auto text-indigo-600 mb-4" />
+             <h2 className="text-3xl font-black uppercase tracking-tight">Selamat Datang, {currentUser.nama}</h2>
+             <p className="text-gray-500 mt-2 font-medium italic uppercase tracking-widest text-xs">Akun Pegawai Kantor Terverifikasi</p>
+             <button onClick={() => setView('user_dashboard')} className="mt-8 bg-indigo-600 text-white px-10 py-4 rounded-[2rem] font-black uppercase tracking-widest hover:bg-indigo-700 shadow-xl transition-all active:scale-95 shadow-indigo-100">Jelajahi Fasilitas</button>
+          </div>
+        )}
+      </main>
+
+      {notification && <Notification message={notification} />}
+      <Footer />
+    </div>
+  );
+}
+
+// ==========================================
+// 3. SUB-KOMPONEN GLOBAL
+// ==========================================
+function Header({ view, setView, currentUser, onLogout, setSelectedCategory }) {
+  return (
+    <nav className="bg-white border-b border-gray-100 shadow-sm sticky top-0 z-50">
+      <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+        <div 
+          className="flex items-center gap-2 cursor-pointer text-indigo-700 transition-transform active:scale-95"
+          onClick={() => { setView('user_dashboard'); setSelectedCategory(null); }}
+        >
+          <div className="bg-indigo-100 p-2 rounded-lg"><Home size={22} /></div>
+          <span className="font-extrabold text-xl tracking-tight uppercase">SIKOPIFASTA</span>
+        </div>
+        
+        {currentUser ? (
+          <div className="flex items-center gap-3">
+             <div className="hidden sm:flex flex-col items-end mr-1 text-right">
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">{currentUser.role === 'admin' ? 'Administrator' : 'Pegawai'}</span>
+                <span className="text-xs font-bold text-gray-900 leading-none">{currentUser.nama}</span>
+             </div>
+             <div className="w-10 h-10 rounded-full border-2 border-indigo-100 bg-indigo-50 flex items-center justify-center text-indigo-600 overflow-hidden shadow-inner shrink-0">
+                {currentUser.foto ? <img src={currentUser.foto} alt="P" className="w-full h-full object-cover" /> : <User size={24} />}
+             </div>
+             <button onClick={onLogout} className="p-2.5 text-red-500 hover:bg-red-50 rounded-xl transition-colors" title="Keluar">
+              <LogOut size={20} />
+            </button>
+          </div>
+        ) : (
+          <button onClick={() => setView('login_portal')} className="flex items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-lg active:scale-95 shadow-indigo-100">
+            <LogIn size={18} /><span className="text-sm">Login</span>
+          </button>
+        )}
+      </div>
+    </nav>
+  );
+}
+
+function Footer() {
+  return (
+    <footer className="py-12 bg-white border-t border-gray-100 mt-auto">
+      <div className="max-w-6xl mx-auto px-4 flex flex-col items-center">
+        <div className="flex items-center gap-2 mb-4 text-gray-300">
+           <ShieldCheck size={16} />
+           <span className="font-black tracking-[0.2em] text-[10px] uppercase italic">SIKOPIFASTA Enterprise v4.4</span>
+        </div>
+        <p className="text-gray-400 text-sm font-bold text-center italic leading-relaxed">
+          "Sistem Kontrol Pinjam Fasilitas dan Inventaris Terpadu" <br/>
+          Dikembangkan untuk efisiensi operasional internal kantor.
+        </p>
+      </div>
+    </footer>
+  );
+}
+
+function Notification({ message }) {
+  return (
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[300] animate-in slide-in-from-bottom-10">
+      <div className="bg-gray-900/95 backdrop-blur-md text-white px-8 py-4 rounded-[2rem] shadow-2xl flex items-center gap-4 border border-white/10 min-w-[320px]">
+        {message.toLowerCase().includes('berhasil') || message.toLowerCase().includes('selamat') ? <CheckCircle2 className="text-emerald-400" /> : <AlertCircle className="text-amber-400" />}
+        <span className="font-bold text-sm tracking-tight text-center">{message}</span>
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
+// 4. VIEW: USER DASHBOARD
+// ==========================================
+function UserDashboard({ setView, setSelectedCategory, exportToExcel }) {
+  return (
+    <div className="p-4 sm:p-8 max-w-6xl mx-auto animate-in fade-in duration-500">
+      <div className="text-center mb-12">
+        <h1 className="text-3xl sm:text-4xl font-black text-gray-900 mb-4 tracking-tight uppercase">SIKOPIFASTA</h1>
+        <p className="text-gray-500 max-w-2xl mx-auto text-lg italic font-medium leading-relaxed">
+          "Sistem Kontrol Pinjam Fasilitas dan Inventaris" <br/>
+          <span className="text-sm not-italic font-normal opacity-70">Kelola peminjaman sarana prasarana kantor lebih transparan.</span>
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {CATEGORIES.map((cat) => (
+          <button
+            key={cat.id}
+            onClick={() => { setSelectedCategory(cat.id); setView('category_detail'); }}
+            className={`${cat.color} ${cat.hover} text-white p-10 rounded-[2.5rem] shadow-xl flex flex-col items-center gap-6 transition-all transform hover:-translate-y-2 active:scale-95 shadow-indigo-100`}
+          >
+            <div className="bg-white/20 p-6 rounded-3xl backdrop-blur-md">{cat.icon}</div>
+            <div className="text-center">
+              <span className="text-xl font-bold block mb-1 uppercase tracking-wide">{cat.id}</span>
+              <span className="text-xs text-white/70 uppercase tracking-[0.2em] font-black">Cek Ketersediaan</span>
+            </div>
+            <div className="bg-white/10 w-full py-2.5 rounded-2xl"><ChevronRight size={24} className="mx-auto" /></div>
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-16 bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
+        <div className="relative z-10">
+          <h3 className="font-black text-gray-900 text-xl mb-2 flex items-center gap-2">
+            <Download className="text-indigo-600" size={24} /> Database Fasilitas
+          </h3>
+          <p className="text-gray-500 font-medium">Unduh data inventaris terbaru dalam format Excel (.xlsx) untuk laporan.</p>
+        </div>
+        <button onClick={exportToExcel} className="relative z-10 w-full md:w-auto bg-gray-900 text-white px-8 py-4 rounded-[1.5rem] font-black flex items-center justify-center gap-3 hover:bg-gray-800 transition-all shadow-lg active:scale-95 uppercase text-sm tracking-widest">
+          <Download size={20} /> Unduh Excel
+        </button>
+        <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-indigo-50 rounded-full blur-3xl opacity-50"></div>
+      </div>
+    </div>
+  );
+}
+
+function CategoryDetail({ selectedCategory, setView, data }) {
+  const [searchTerm, setSearchTerm] = useState('');
+  return (
+    <div className="p-4 sm:p-8 max-w-6xl mx-auto animate-in slide-in-from-bottom-4 duration-500">
+      <div className="flex items-center gap-4 mb-8">
+        <button onClick={() => setView('user_dashboard')} className="p-3 bg-white hover:bg-gray-50 rounded-2xl border border-gray-100 shadow-sm transition-all active:scale-90 text-gray-600"><ArrowLeft size={24} /></button>
+        <div><h2 className="text-2xl font-black text-gray-900 mb-1 leading-none uppercase tracking-tight">{selectedCategory}</h2><p className="text-gray-500 text-sm font-medium">Temukan fasilitas yang Anda butuhkan.</p></div>
+      </div>
+      <div className="relative mb-8"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={22} /><input type="text" placeholder={`Cari di ${selectedCategory}...`} className="w-full pl-12 pr-6 py-4 rounded-3xl border border-gray-200 focus:outline-none focus:ring-4 focus:ring-indigo-100 shadow-sm text-lg transition-all font-bold" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
+      <div className="grid grid-cols-1 gap-4">
+        {data.filter(item => item.kategori === selectedCategory && item.nama.toLowerCase().includes(searchTerm.toLowerCase())).map(item => (
+          <div key={item.id} className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-6 group hover:border-indigo-200 transition-all">
+            <div className="flex gap-5">
+              <div className="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                {item.kategori === 'Kendaraan Dinas' ? <Car size={28}/> : item.kategori === 'Peralatan Elektronik' ? <Laptop size={28}/> : <Package size={28}/>}
+              </div>
+              <div><h4 className="font-bold text-gray-900 text-lg group-hover:text-indigo-700 transition-colors leading-tight uppercase">{item.nama}</h4><p className="text-sm text-gray-500 font-medium mt-1">{item.kategori === 'Kendaraan Dinas' ? item.noPlat : (item.kategori === 'Peralatan Elektronik' || item.kategori === 'Barang Lain' ? `${item.merek || ''} - ${item.nup || ''}` : item.spek)}</p></div>
+            </div>
+            <div className="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-t-0 pt-4 sm:pt-0">
+               <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${item.status === 'Tersedia' ? 'bg-green-50 text-green-700 border-green-100' : item.status === 'Dipinjam' ? 'bg-orange-50 text-orange-700 border-orange-100' : 'bg-red-50 text-red-700 border-red-100'}`}>{item.status}</span>
+               <button onClick={() => setView('login_portal')} className="bg-indigo-600 text-white px-10 py-3 rounded-2xl text-sm font-black uppercase tracking-widest hover:bg-indigo-700 active:scale-95 shadow-lg shadow-indigo-100">Pinjam</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
+// 5. VIEW: LOGIN PORTAL
+// ==========================================
+function LoginPortal({ setView, users, setCurrentUser, showNotification }) {
+  const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const foundUser = users.find(u => u.username === identifier || u.email === identifier || u.nip === identifier);
+    if (!foundUser) { showNotification("Username, Email, atau NIP tidak ditemukan."); return; }
+    if (foundUser.password !== password) { showNotification("Kata Sandi yang dimasukkan salah."); return; }
+    setCurrentUser(foundUser);
+    if (foundUser.role === 'admin') setView('admin_panel'); else setView('user_panel');
+    showNotification(`Selamat datang kembali, ${foundUser.nama}!`);
+  };
+
+  return (
+    <div className="flex items-center justify-center min-h-[calc(100vh-64px)] p-4 bg-slate-50">
+      <div className="bg-white p-10 rounded-[3.5rem] shadow-2xl max-w-md w-full border border-white animate-in zoom-in-95">
+        <div className="text-center mb-10">
+          <div className="bg-indigo-600 w-20 h-20 rounded-[2rem] flex items-center justify-center mx-auto mb-6 text-white shadow-xl rotate-3">
+            <ShieldCheck size={40} />
+          </div>
+          <h2 className="text-3xl font-black text-gray-900 tracking-tight leading-none mb-2 uppercase text-center">Portal Masuk</h2>
+          <p className="text-gray-400 text-sm font-medium italic text-center leading-relaxed">Gunakan Username, Email, atau NIP Anda.</p>
+        </div>
+
+        <form className="space-y-6" onSubmit={handleSubmit}>
+          <div>
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Kredensial Pengguna</label>
+            <div className="relative mt-1">
+               <UserCircle className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={22} />
+               <input type="text" className="w-full pl-12 pr-5 py-4 bg-gray-50 border-none rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold shadow-inner" placeholder="Username / Email / NIP" value={identifier} onChange={(e) => setIdentifier(e.target.value)} required />
+            </div>
+          </div>
+          <div>
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Kata Sandi</label>
+            <div className="relative mt-1">
+               <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={22} />
+               <input type="password" className="w-full pl-12 pr-5 py-4 bg-gray-50 border-none rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold shadow-inner" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            </div>
+          </div>
+          <button type="submit" className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-lg hover:bg-indigo-700 transition-all shadow-xl active:scale-95 mt-4 shadow-indigo-100 uppercase tracking-widest">
+            Masuk Sekarang
+          </button>
+        </form>
+
+        <div className="mt-8 flex flex-col gap-4 border-t border-gray-50 pt-8 text-center">
+           <button onClick={() => setView('registration_portal')} className="flex items-center justify-center gap-2 text-indigo-600 font-black text-sm uppercase tracking-widest hover:text-indigo-800 transition-colors">
+             <UserPlus size={18} /> Daftar Pengguna Baru
+           </button>
+           <button onClick={() => showNotification("Instruksi reset sandi dikirim ke Email/WhatsApp profil.")} className="flex items-center justify-center gap-2 text-gray-400 font-bold text-sm hover:text-red-500 transition-colors uppercase tracking-widest">
+             <KeyRound size={16} /> Lupa Password?
+           </button>
+        </div>
+
+        <button onClick={() => setView('user_dashboard')} className="w-full mt-10 text-gray-300 font-black hover:text-indigo-400 text-xs uppercase tracking-[0.2em] transition-colors text-center">
+            Kembali ke Beranda
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
+// 6. VIEW: REGISTRASI PENGGUNA
+// ==========================================
+function RegistrationPortal({ setView, users, setUsers, showNotification }) {
+  const [formData, setFormData] = useState({ nama: '', nip: '', username: '', email: '', whatsapp: '', password: '', confirmPassword: '' });
+  const [showPass, setShowPass] = useState(false);
+
+  const handleRegister = (e) => {
+    e.preventDefault();
+    if (!/^\d+$/.test(formData.whatsapp) || !formData.whatsapp.startsWith('0')) { showNotification("WA harus angka dan diawali 0."); return; }
+    if (!/^\d+$/.test(formData.nip)) { showNotification("NIP harus numerik (0 jika tdk ada)."); return; }
+    if (formData.password.length < 8) { showNotification("Sandi minimal 8 karakter."); return; }
+    if (formData.password !== formData.confirmPassword) { showNotification("Konfirmasi sandi tidak cocok."); return; }
+    if (users.some(u => u.username === formData.username || u.email === formData.email || (formData.nip !== "0" && u.nip === formData.nip))) { showNotification("Data identitas sudah terdaftar."); return; }
+    
+    const newUser = { ...formData, nama: formData.nama.toUpperCase(), role: 'user', historyTerlambat: 0, historyRusak: 0, id: Date.now(), foto: null };
+    setUsers([...users, newUser]);
+    showNotification("Selamat! Registrasi Berhasil. Silakan Login.");
+    setView('login_portal');
+  };
+
+  return (
+    <div className="flex items-center justify-center min-h-[calc(100vh-64px)] p-4 bg-slate-50">
+      <div className="bg-white p-10 rounded-[3.5rem] shadow-2xl max-w-xl w-full border border-white animate-in zoom-in-95 overflow-y-auto max-h-[95vh]">
+        <div className="text-center mb-8">
+          <div className="bg-emerald-500 w-16 h-16 rounded-[1.5rem] flex items-center justify-center mx-auto mb-4 text-white shadow-lg rotate-6">
+            <UserPlus size={32} />
+          </div>
+          <h2 className="text-2xl font-black text-gray-900 uppercase tracking-tight text-center">Registrasi Akun</h2>
+          <p className="text-gray-400 text-sm font-medium italic text-center">Sistem Kedisiplinan Internal SIKOPIFASTA</p>
+        </div>
+        
+        <form className="space-y-4" onSubmit={handleRegister}>
+          <div>
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nama Lengkap (Wajib)</label>
+            <input required value={formData.nama} onChange={e => setFormData({...formData, nama: e.target.value.toUpperCase()})} className="w-full px-5 py-3.5 bg-gray-50 border-none rounded-2xl focus:ring-4 focus:ring-emerald-100 outline-none font-bold uppercase" placeholder="MASUKKAN NAMA LENGKAP" />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 text-xs">NIP (0 jika tdk ada)</label>
+              <input required type="text" value={formData.nip} onChange={e => setFormData({...formData, nip: e.target.value})} className="w-full px-5 py-3.5 bg-gray-50 border-none rounded-2xl focus:ring-4 focus:ring-emerald-100 outline-none font-bold" placeholder="19XXXXXXXXXX" />
+            </div>
+            <div>
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 text-xs">Username (Tanpa Spasi)</label>
+              <input required value={formData.username} onChange={e => setFormData({...formData, username: e.target.value.replace(/\s/g, '').toLowerCase()})} className="w-full px-5 py-3.5 bg-gray-50 border-none rounded-2xl focus:ring-4 focus:ring-emerald-100 outline-none font-bold" placeholder="usernameanda" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 text-xs">Email Kantor/Pribadi</label>
+              <input required type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full px-5 py-3.5 bg-gray-50 border-none rounded-2xl focus:ring-4 focus:ring-emerald-100 outline-none font-bold" placeholder="nama@email.com" />
+            </div>
+            <div>
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 text-xs">No. WhatsApp (Awalan 0)</label>
+              <input required type="text" value={formData.whatsapp} onChange={e => setFormData({...formData, whatsapp: e.target.value})} className="w-full px-5 py-3.5 bg-gray-50 border-none rounded-2xl focus:ring-4 focus:ring-emerald-100 outline-none font-bold" placeholder="08XXXXXXXXXX" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 text-xs">Password</label>
+              <div className="relative">
+                <input required type={showPass ? "text" : "password"} value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className="w-full px-5 py-3.5 bg-gray-50 border-none rounded-2xl focus:ring-4 focus:ring-emerald-100 outline-none font-bold pr-12" />
+                <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-600 transition-colors">{showPass ? <EyeOff size={18}/> : <Eye size={18}/>}</button>
+              </div>
+            </div>
+            <div>
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 text-xs">Konfirmasi Password</label>
+              <input required type="password" value={formData.confirmPassword} onChange={e => setFormData({...formData, confirmPassword: e.target.value})} className="w-full px-5 py-3.5 bg-gray-50 border-none rounded-2xl focus:ring-4 focus:ring-emerald-100 outline-none font-bold" />
+            </div>
+          </div>
+
+          <button type="submit" className="w-full bg-emerald-600 text-white py-4 rounded-[1.8rem] font-black text-lg hover:bg-emerald-700 transition-all shadow-xl mt-6 uppercase tracking-[0.2em] shadow-emerald-100">Daftar Sekarang</button>
+        </form>
+        <button onClick={() => setView('login_portal')} className="w-full mt-6 text-gray-400 font-bold hover:text-indigo-600 transition-colors text-xs uppercase tracking-widest text-center underline">Batal / Kembali ke Login</button>
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
+// 7. VIEW: ADMIN PANEL
+// ==========================================
+function AdminPanel({ data, setData, users, setUsers, appSettings, setAppSettings, adminProfile, setAdminProfile, showNotification, setView, exportCategoryExcel }) {
+  const [adminSubView, setAdminSubView] = useState('assets'); 
+  const [activeAssetTab, setActiveAssetTab] = useState('Kendaraan Dinas'); 
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
+  const [selectedDetailItem, setSelectedDetailItem] = useState(null);
+  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const fileInputRef = useRef(null);
+
+  const [adminSearch, setAdminSearch] = useState('');
+  const [adminStatusFilter, setAdminStatusFilter] = useState('Semua');
+  const [userSearch, setUserSearch] = useState(''); 
+
+  const [formData, setFormData] = useState({ 
+    nama: '', kategori: '', status: 'Tersedia', spek: '', noPlat: '', noRangka: '',
+    noMesin: '', kilometer: '', tglOliMesin: '', tglOliMesinNext: '',
+    tglOliPerseneling: '', tglOliPersenelingNext: '', tglPajak: '', deskripsiRusak: '',
+    nup: '', merek: '', peminjam: '', usernamePeminjam: '', tglPinjam: '', tglKembali: ''
+  });
+
+  const [userFormData, setUserFormData] = useState({
+    nama: '', nip: '', email: '', whatsapp: '', username: '', password: ''
+  });
+
+  const handleAddOrEdit = (e) => {
+    e.preventDefault();
+    const finalData = { ...formData, kategori: activeAssetTab };
+    if (editingItem) {
+      setData(data.map(item => item.id === editingItem.id ? { ...finalData, id: item.id } : item));
+      showNotification("Data fasilitas berhasil diperbarui!");
+    } else {
+      setData([...data, { ...finalData, id: Date.now() }]);
+      showNotification("Data fasilitas baru berhasil ditambahkan!");
+    }
+    closeModal();
+  };
+
+  const handleEditUser = (e) => {
+    e.preventDefault();
+    setUsers(users.map(u => u.id === editingUser.id ? { ...userFormData, id: u.id, role: u.role, historyRusak: u.historyRusak, historyTerlambat: u.historyTerlambat } : u));
+    showNotification("Data profil pengguna berhasil diperbarui!");
+    setIsUserModalOpen(false);
+  };
+
+  const resetUserPassword = (userId) => {
+    setUsers(users.map(u => u.id === userId ? { ...u, password: 'password123' } : u));
+    showNotification("Sandi pengguna telah direset ke default.");
+  };
+
+  const deleteUser = (userId) => {
+    setUsers(users.filter(u => u.id !== userId));
+    showNotification("Akun pengguna telah dihapus permanen.");
+  };
+
+  const openModal = (item = null) => {
+    if (item) { setEditingItem(item); setFormData(item); } 
+    else { 
+      setEditingItem(null); 
+      setFormData({ 
+        nama: activeAssetTab === 'Peralatan Elektronik' ? ELEKTRONIK_OPTIONS[0] : '', 
+        kategori: activeAssetTab, status: 'Tersedia', spek: '', noPlat: '', noRangka: '',
+        noMesin: '', kilometer: '', tglOliMesin: '', tglOliMesinNext: '',
+        tglOliPerseneling: '', tglOliPersenelingNext: '', tglPajak: '', deskripsiRusak: '',
+        nup: '', merek: '', peminjam: '', usernamePeminjam: '', tglPinjam: '', tglKembali: ''
+      }); 
+    }
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => { setIsModalOpen(false); setEditingItem(null); };
+  const openDetailModal = (item) => { setSelectedDetailItem(item); setIsDetailModalOpen(true); };
+  const closeDetailModal = () => { setIsDetailModalOpen(false); setSelectedDetailItem(null); };
+
+  const handleImportExcel = (e) => {
+    const file = e.target.files[0];
+    if (!file || typeof window.XLSX === 'undefined') return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const wb = window.XLSX.read(evt.target.result, { type: 'binary' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const importedData = window.XLSX.utils.sheet_to_json(ws);
+        const otherCategoriesData = data.filter(item => item.kategori !== activeAssetTab);
+        const newCategoryData = importedData.map((item, idx) => ({ ...item, id: item.id || Date.now() + idx, kategori: activeAssetTab }));
+        setData([...otherCategoriesData, ...newCategoryData]);
+        showNotification(`Unggah data ke ${activeAssetTab} berhasil!`);
+        e.target.value = null;
+      } catch (err) { showNotification("Gagal memproses file Excel."); }
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  return (
+    <div className="max-w-6xl mx-auto p-4 sm:p-8 animate-in slide-in-from-bottom-2">
+      <div className="flex flex-wrap bg-white p-2 rounded-3xl shadow-sm border border-gray-100 mb-8 w-full sm:w-max gap-1">
+        <button onClick={() => setAdminSubView('assets')} className={`flex-1 sm:flex-none flex items-center gap-2 px-6 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all ${adminSubView === 'assets' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-400 hover:bg-gray-50'}`}>
+          <LayoutGrid size={18} /> Inventaris
+        </button>
+        <button onClick={() => setAdminSubView('users')} className={`flex-1 sm:flex-none flex items-center gap-2 px-6 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all ${adminSubView === 'users' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-400 hover:bg-gray-50'}`}>
+          <Users size={18} /> Pengguna
+        </button>
+        <button onClick={() => setAdminSubView('profile')} className={`flex-1 sm:flex-none flex items-center gap-2 px-6 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all ${adminSubView === 'profile' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-400 hover:bg-gray-50'}`}>
+          <UserCircle size={18} /> Profil
+        </button>
+        <button onClick={() => setAdminSubView('settings')} className={`flex-1 sm:flex-none flex items-center gap-2 px-6 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all ${adminSubView === 'settings' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-400 hover:bg-gray-50'}`}>
+          <Settings size={18} /> Sistem
+        </button>
+      </div>
+
+      {adminSubView === 'assets' ? (
+        <AdminAssetsSection 
+          activeAssetTab={activeAssetTab} setActiveAssetTab={setActiveAssetTab} data={data} setData={setData} openModal={openModal} openDetailModal={openDetailModal} showNotification={showNotification} adminSearch={adminSearch} setAdminSearch={setAdminSearch} adminStatusFilter={adminStatusFilter} setAdminStatusFilter={setAdminStatusFilter} exportCategoryExcel={exportCategoryExcel} onImportClick={() => fileInputRef.current?.click()}
+        />
+      ) : adminSubView === 'users' ? (
+        <AdminUsersSection 
+          users={users} data={data} 
+          userSearch={userSearch} setUserSearch={setUserSearch}
+          onEdit={(u) => { setEditingUser(u); setUserFormData({nama: u.nama, nip: u.nip, email: u.email, whatsapp: u.whatsapp, username: u.username, password: u.password}); setIsUserModalOpen(true); }} 
+          onReset={resetUserPassword} onDelete={deleteUser} 
+        />
+      ) : adminSubView === 'profile' ? (
+        <AdminProfileSection adminProfile={adminProfile} setAdminProfile={setAdminProfile} showNotification={showNotification} />
+      ) : (
+        <AppSettingsSection appSettings={appSettings} setAppSettings={setAppSettings} showNotification={showNotification} />
+      )}
+
+      <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx, .xls, .csv" onChange={handleImportExcel} />
+
+      {isUserModalOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+            <div className="p-8 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10"><h3 className="text-2xl font-black text-gray-900 uppercase tracking-tight">Edit Data Pegawai</h3><button onClick={() => setIsUserModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-xl"><X /></button></div>
+            <form onSubmit={handleEditUser} className="p-8 space-y-4 text-left">
+              <div><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nama Lengkap</label><input required value={userFormData.nama} onChange={e => setUserFormData({...userFormData, nama: e.target.value.toUpperCase()})} className="w-full px-5 py-3.5 bg-gray-50 border-none rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold" /></div>
+              <div><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">NIP</label><input required value={userFormData.nip} onChange={e => setUserFormData({...userFormData, nip: e.target.value})} className="w-full px-5 py-3.5 bg-gray-50 border-none rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold" /></div>
+              <div><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Email Kantor</label><input type="email" required value={userFormData.email} onChange={e => setUserFormData({...userFormData, email: e.target.value})} className="w-full px-5 py-3.5 bg-gray-50 border-none rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold" /></div>
+              <div><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">WhatsApp</label><input required value={userFormData.whatsapp} onChange={e => setUserFormData({...userFormData, whatsapp: e.target.value})} className="w-full px-5 py-3.5 bg-gray-50 border-none rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold" /></div>
+              <div className="flex gap-4 pt-6"><button type="button" onClick={() => setIsUserModalOpen(false)} className="flex-1 py-4 bg-gray-100 rounded-[1.5rem] font-bold uppercase text-xs">Batal</button><button type="submit" className="flex-1 py-4 bg-indigo-600 text-white rounded-[1.5rem] font-bold uppercase shadow-xl text-xs">Simpan</button></div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isModalOpen && <AssetModal activeAssetTab={activeAssetTab} editingItem={editingItem} formData={formData} setFormData={setFormData} closeModal={closeModal} handleAddOrEdit={handleAddOrEdit} />}
+      {isDetailModalOpen && <AssetDetailModal selectedDetailItem={selectedDetailItem} closeDetailModal={closeDetailModal} />}
+    </div>
+  );
+}
+
+// ==========================================
+// 8. MODUL ADMIN: MANAJEMEN ASET
+// ==========================================
+function AdminAssetsSection({ activeAssetTab, setActiveAssetTab, data, setData, openModal, openDetailModal, showNotification, adminSearch, setAdminSearch, adminStatusFilter, setAdminStatusFilter, exportCategoryExcel, onImportClick }) {
+  const handleDelete = (id) => { setData(data.filter(item => item.id !== id)); showNotification("Data fasilitas dihapus."); };
+  const today = new Date().toISOString().split('T')[0];
+  const filteredAndSortedData = data.filter(item => {
+    const matchCategory = item.kategori === activeAssetTab;
+    const searchString = adminSearch.toLowerCase();
+    const matchSearch = item.nama.toLowerCase().includes(searchString) || (item.noPlat && item.noPlat.toLowerCase().includes(searchString)) || (item.nup && item.nup.toLowerCase().includes(searchString)) || (item.merek && item.merek.toLowerCase().includes(searchString)) || (item.peminjam && item.peminjam.toLowerCase().includes(searchString));
+    const matchStatus = adminStatusFilter === 'Semua' ? true : item.status === adminStatusFilter;
+    return matchCategory && matchSearch && matchStatus;
+  }).sort((a, b) => {
+    if (a.tglKembali && b.tglKembali) return a.tglKembali.localeCompare(b.tglKembali);
+    if (a.tglKembali) return -1; if (b.tglKembali) return 1; return 0;
+  });
+
+  return (
+    <div className="animate-in fade-in">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-8 text-left">
+        <div><h2 className="text-2xl font-black text-gray-900 mb-1 uppercase tracking-tight">Inventaris Kantor</h2><p className="text-gray-500 text-sm font-medium italic">Kategori: <span className="text-indigo-600 font-bold uppercase">{activeAssetTab}</span></p></div>
+        <div className="flex flex-wrap gap-3"><button onClick={onImportClick} className="flex-1 sm:flex-none bg-emerald-50 text-emerald-700 border border-emerald-100 px-5 py-3 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-100 transition-all text-xs uppercase tracking-widest"><Upload size={18} /> Unggah</button><button onClick={() => exportCategoryExcel(activeAssetTab)} className="flex-1 sm:flex-none bg-blue-50 text-blue-700 border border-blue-100 px-5 py-3 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-blue-100 transition-all text-xs uppercase tracking-widest"><Download size={18} /> Unduh</button><button onClick={() => openModal()} className="flex-1 sm:flex-none bg-indigo-600 text-white px-6 py-3 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-indigo-700 shadow-xl uppercase tracking-widest text-xs"><Plus size={20} /> Tambah</button></div>
+      </div>
+      <div className="flex flex-wrap gap-2 mb-6 p-1.5 bg-gray-100/50 rounded-2xl w-full sm:w-max">{CATEGORIES.map((cat) => (<button key={cat.id} onClick={() => { setActiveAssetTab(cat.id); setAdminSearch(''); setAdminStatusFilter('Semua'); }} className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs transition-all uppercase tracking-wider ${activeAssetTab === cat.id ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-200/50'}`}>{cat.id === 'Kendaraan Dinas' ? <Car size={16}/> : cat.id === 'Peralatan Elektronik' ? <Laptop size={16}/> : <Package size={16}/>}{cat.id}</button>))}</div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6"><div className="md:col-span-2 relative"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} /><input type="text" placeholder={`Cari nama, plat, NUP, atau peminjam...`} className="w-full pl-12 pr-4 py-3.5 bg-white border border-gray-100 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold shadow-sm" value={adminSearch} onChange={(e) => setAdminSearch(e.target.value)} /></div><div className="relative"><Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} /><select className="w-full pl-12 pr-4 py-3.5 bg-white border border-gray-100 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold shadow-sm appearance-none cursor-pointer" value={adminStatusFilter} onChange={(e) => setAdminStatusFilter(e.target.value)}><option value="Semua">Semua Status</option><option value="Tersedia">Tersedia</option><option value="Dipinjam">Dipinjam</option><option value="Rusak">Rusak</option></select></div></div>
+      <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-left text-sm min-w-[1100px]"><thead className="bg-gray-50/50 border-b border-gray-100"><tr><th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest w-64">Detail Barang</th>{activeAssetTab === 'Kendaraan Dinas' ? (<th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest hidden md:table-cell">Plat Nomor</th>) : (activeAssetTab === 'Peralatan Elektronik' || activeAssetTab === 'Barang Lain') ? (<><th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest hidden md:table-cell">Merek</th><th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest hidden md:table-cell">NUP</th></>) : (<th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest hidden md:table-cell">Spek Singkat</th>)}<th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest">Peminjam</th><th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest">Tgl Pinjam</th><th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest">Tgl Kembali</th><th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest text-center">Status</th><th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest text-right">Aksi</th></tr></thead><tbody className="divide-y divide-gray-50">{filteredAndSortedData.map(item => { const isDueToday = item.status === 'Dipinjam' && item.tglKembali === today; return (<tr key={item.id} className={`transition-colors group ${isDueToday ? 'bg-red-50 hover:bg-red-100/50' : 'hover:bg-indigo-50/30'}`}><td className="px-6 py-5"><div className="flex items-center gap-4"><div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${isDueToday ? 'bg-red-200 text-red-700' : (item.kategori === 'Kendaraan Dinas' ? 'bg-indigo-50 text-indigo-600' : item.kategori === 'Peralatan Elektronik' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600')}`}>{item.kategori === 'Kendaraan Dinas' ? <Car size={24}/> : item.kategori === 'Peralatan Elektronik' ? <Laptop size={24}/> : <Package size={24}/>}</div><div><div className={`font-bold group-hover:text-indigo-700 transition-colors leading-tight uppercase ${isDueToday ? 'text-red-700' : 'text-gray-900'}`}>{item.nama}</div><div className="text-xs text-gray-400 font-medium mt-1">{activeAssetTab === 'Kendaraan Dinas' ? item.noPlat : (activeAssetTab === 'Peralatan Elektronik' || activeAssetTab === 'Barang Lain' ? item.merek : item.spek)}</div></div></div></td>{activeAssetTab === 'Kendaraan Dinas' ? (<td className={`px-6 py-5 hidden md:table-cell font-mono font-bold ${isDueToday ? 'text-red-600' : 'text-gray-600'}`}>{item.noPlat}</td>) : (activeAssetTab === 'Peralatan Elektronik' || activeAssetTab === 'Barang Lain') ? (<><td className={`px-6 py-5 hidden md:table-cell font-bold ${isDueToday ? 'text-red-600' : 'text-gray-600'}`}>{item.merek}</td><td className="px-6 py-5 hidden md:table-cell font-mono text-gray-500">{item.nup}</td></>) : (<td className="px-6 py-5 hidden md:table-cell text-gray-500 italic text-xs">{item.spek}</td>)}<td className="px-6 py-5 font-bold uppercase">{item.status === 'Dipinjam' ? (<div className="flex items-center gap-2"><UserCircle size={16} className={isDueToday ? 'text-red-600' : 'text-orange-500'} /><span className={isDueToday ? 'text-red-800' : 'text-gray-800'}>{item.peminjam}</span></div>) : (<span className="text-gray-300">-</span>)}</td><td className="px-6 py-5 font-medium text-gray-500">{item.status === 'Dipinjam' ? item.tglPinjam : "-"}</td><td className={`px-6 py-5 font-black ${isDueToday ? 'text-red-600 animate-pulse' : 'text-gray-600'}`}>{item.status === 'Dipinjam' ? (<div className="flex items-center gap-1"><Clock size={14} />{item.tglKembali || 'Belum diatur'}</div>) : "-"}</td><td className="px-6 py-5 text-center"><span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${isDueToday ? 'bg-red-600 text-white border-red-700' : (item.status === 'Tersedia' ? 'bg-green-50 text-green-700 border-green-100' : item.status === 'Dipinjam' ? 'bg-orange-50 text-orange-700 border-orange-100' : 'bg-red-50 text-red-700 border-red-100')}`}>{isDueToday ? 'Jatuh Tempo' : item.status}</span></td><td className="px-6 py-4 text-right"><div className="flex items-center justify-end gap-1">{(activeAssetTab === 'Kendaraan Dinas' || activeAssetTab === 'Peralatan Elektronik' || activeAssetTab === 'Barang Lain') && (<button onClick={() => openDetailModal(item)} className={`p-2.5 rounded-xl transition-all ${isDueToday ? 'text-red-600 hover:bg-red-200' : 'text-indigo-400 hover:text-indigo-700 hover:bg-indigo-50'}`} title="Rincian Detail"><FileText size={20} /></button>)}<button onClick={() => openModal(item)} className="p-2.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all" title="Edit Data"><Edit size={20} /></button><button onClick={() => handleDelete(item.id)} className="p-2.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all" title="Hapus Data"><Trash2 size={20} /></button></div></td></tr>); })}</tbody></table></div></div>
+    </div>
+  );
+}
+
+// ==========================================
+// 9. MODUL ADMIN: KEDISIPLINAN PENGGUNA (USERS)
+// ==========================================
+function AdminUsersSection({ users, data, userSearch, setUserSearch, onEdit, onReset, onDelete }) {
+  const calculateRating = (late, damaged) => {
+    if (late > 8 || damaged >= 8) return 1;
+    if (late > 6 || damaged > 6) return 2;
+    if (late > 3 || damaged > 3) return 3;
+    if (late >= 1 || damaged >= 1) return 4;
+    return 5;
+  };
+
+  const getUserBorrowInfo = (username) => data.find(item => item.status === 'Dipinjam' && (item.usernamePeminjam === username || item.peminjam === username));
+
+  const filteredSortedUsers = users
+    .filter(u => u.role !== 'admin')
+    .filter(u => {
+      const borrow = getUserBorrowInfo(u.username);
+      const searchString = userSearch.toLowerCase();
+      return u.nama.toLowerCase().includes(searchString) || (borrow && borrow.nama.toLowerCase().includes(searchString));
+    })
+    .sort((a, b) => {
+      const bA = getUserBorrowInfo(a.username); const bB = getUserBorrowInfo(b.username);
+      if (bA && bB) return bA.tglKembali.localeCompare(bB.tglKembali);
+      if (bA) return -1; if (bB) return 1; return 0;
+    });
+
+  return (
+    <div className="animate-in fade-in slide-in-from-bottom-2">
+      <div className="mb-10 text-left uppercase tracking-tight"><h2 className="text-2xl font-black text-gray-900 mb-1">Kedisiplinan Pengguna</h2><p className="text-gray-400 text-sm font-medium italic lowercase">Monitoring rekam jejak penggunaan fasilitas kantor.</p></div>
+      
+      <div className="relative mb-8">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+        <input 
+          type="text" 
+          placeholder="Cari Nama Pengguna atau Nama Barang yang sedang dipinjam..." 
+          className="w-full pl-12 pr-6 py-4 bg-white border border-gray-100 rounded-3xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold shadow-sm transition-all"
+          value={userSearch}
+          onChange={(e) => setUserSearch(e.target.value)}
+        />
+      </div>
+
+      <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-left text-sm min-w-[1200px]"><thead className="bg-gray-50/50 border-b border-gray-100"><tr><th className="px-6 py-5 font-black text-gray-400 uppercase tracking-widest">Pengguna</th><th className="px-6 py-5 font-black text-gray-400 uppercase tracking-widest">Identitas NIP</th><th className="px-6 py-5 font-black text-gray-400 uppercase tracking-widest">Pinjaman Aktif</th><th className="px-6 py-5 font-black text-gray-400 uppercase tracking-widest">Jatuh Tempo</th><th className="px-6 py-5 font-black text-gray-400 uppercase tracking-widest text-center">Rating</th><th className="px-6 py-5 font-black text-gray-400 uppercase tracking-widest text-right">Aksi Akun</th></tr></thead><tbody className="divide-y divide-gray-50">{filteredSortedUsers.map(u => {
+        const borrow = getUserBorrowInfo(u.username); const rating = calculateRating(u.historyTerlambat, u.historyRusak); const isVBad = rating === 1;
+        return (<tr key={u.id} className={`transition-all ${isVBad ? 'bg-red-50 hover:bg-red-100/50' : 'hover:bg-indigo-50/20'}`}><td className="px-6 py-5"><div className="flex items-center gap-4"><div className="w-12 h-12 rounded-full bg-gray-100 border border-gray-200 overflow-hidden shrink-0 shadow-inner">{u.foto ? <img src={u.foto} alt="P" className="w-full h-full object-cover" /> : <UserCircle size={28} className="mx-auto mt-2 text-gray-300" />}</div><div><p className="font-black text-gray-900 leading-tight uppercase mb-0.5">{u.nama}</p><p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">@{u.username}</p></div></div></td><td className="px-6 py-5"><p className="text-[10px] font-black text-indigo-400 tracking-widest uppercase">NIP: {u.nip}</p></td><td className="px-6 py-5">{borrow ? (<div className="flex items-center gap-2 text-indigo-600 bg-indigo-50 px-4 py-2 rounded-xl font-black uppercase border border-indigo-100 w-max"><Package size={16} /><span>{borrow.nama}</span></div>) : <span className="text-gray-300 italic font-medium">Nihil</span>}</td><td className="px-6 py-5 font-black">{borrow ? (<div className={`flex items-center gap-1.5 ${borrow.tglKembali === new Date().toISOString().split('T')[0] ? 'text-red-600 animate-pulse' : 'text-gray-600'}`}><Clock size={16} />{borrow.tglKembali}</div>) : "-"}</td><td className="px-6 py-5"><div className="flex flex-col items-center"><div className="flex gap-1">{[1,2,3,4,5].map(s => (<Star key={s} size={16} fill={s <= rating ? (isVBad ? "#ef4444" : "#f59e0b") : "none"} stroke={s <= rating ? (isVBad ? "#ef4444" : "#f59e0b") : "#d1d5db"} />))}</div><p className={`text-[9px] font-black mt-2 uppercase tracking-widest ${isVBad ? 'text-red-600' : 'text-gray-400'}`}>L: {u.historyTerlambat} | R: {u.historyRusak}</p></div></td><td className="px-6 py-5 text-right"><div className="flex items-center justify-end gap-1.5"><button onClick={() => onReset(u.id)} className="p-2.5 text-amber-500 hover:bg-amber-50 rounded-xl transition-all border border-transparent hover:border-amber-100" title="Reset Password"><RotateCcw size={20}/></button><button onClick={() => onEdit(u)} className="p-2.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all border border-transparent hover:border-indigo-100"><Edit size={20}/></button><button onClick={() => onDelete(u.id)} className="p-2.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all border border-transparent hover:border-red-100"><Trash2 size={20}/></button></div></td></tr>);
+      })}</tbody></table></div></div>
+    </div>
+  );
+}
+
+function AdminProfileSection({ adminProfile, setAdminProfile, showNotification }) {
+  const [showPassword, setShowPassword] = useState(false);
+  const handlePhotoChange = (e) => { const file = e.target.files[0]; if (file) { const reader = new FileReader(); reader.onloadend = () => { setAdminProfile({ ...adminProfile, foto: reader.result }); showNotification("Foto profil diperbarui!"); }; reader.readAsDataURL(file); } };
+  const handleSave = (e) => { e.preventDefault(); showNotification("Perubahan profil berhasil disimpan!"); };
+  return (
+    <div className="max-w-4xl mx-auto animate-in fade-in"><div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden"><div className="bg-indigo-600 h-32 relative"><div className="absolute -bottom-12 left-8 border-4 border-white rounded-[2.5rem] shadow-xl overflow-hidden bg-white group cursor-pointer transition-transform hover:scale-105"><img src={adminProfile.foto || 'https://via.placeholder.com/150'} alt="Admin" className="w-28 h-28 object-cover" /><label className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity cursor-pointer"><Camera size={24} /><input type="file" className="hidden" accept="image/*" onChange={handlePhotoChange} /></label></div></div><div className="pt-16 px-8 pb-10"><div className="flex items-center gap-3 mb-8 border-b border-gray-50 pb-4 text-left"><Settings className="text-indigo-600" size={28} /><div><h2 className="text-2xl font-black text-gray-900 leading-tight uppercase">Pengaturan Profil</h2><p className="text-gray-400 text-sm font-medium italic uppercase tracking-widest">Akun Kendali SIKOPIFASTA</p></div></div>
+      <form onSubmit={handleSave} className="space-y-8 text-left"><div className="grid grid-cols-1 md:grid-cols-2 gap-6"><div className="md:col-span-2"><h4 className="text-xs font-black text-indigo-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-2"><User size={14} /> Identitas Pegawai</h4></div><div className="space-y-2"><label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Nama Lengkap</label><input required value={adminProfile.nama} onChange={e => setAdminProfile({...adminProfile, nama: e.target.value.toUpperCase()})} className="w-full px-5 py-3.5 bg-gray-50 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold text-gray-800" /></div><div className="space-y-2"><label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">NIP</label><input required value={adminProfile.nip} onChange={e => setAdminProfile({...adminProfile, nip: e.target.value})} className="w-full px-5 py-3.5 bg-gray-50 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold" /></div><div className="space-y-2"><label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-1"><Mail size={12} /> Email</label><input type="email" required value={adminProfile.email} onChange={e => setAdminProfile({...adminProfile, email: e.target.value})} className="w-full px-5 py-3.5 bg-gray-50 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold" /></div><div className="space-y-2"><label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-1"><Phone size={12} /> WhatsApp</label><input type="tel" required value={adminProfile.whatsapp} onChange={e => setAdminProfile({...adminProfile, whatsapp: e.target.value})} className="w-full px-5 py-3.5 bg-gray-50 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold" /></div></div><div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-gray-50"><div className="md:col-span-2"><h4 className="text-xs font-black text-red-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-2"><Lock size={14} /> Keamanan Login</h4></div><div className="space-y-2"><label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Username</label><div className="relative"><Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} /><input required value={adminProfile.username} onChange={e => setAdminProfile({...adminProfile, username: e.target.value})} className="w-full pl-12 pr-5 py-3.5 bg-gray-50 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold text-indigo-700" /></div></div><div className="space-y-2"><label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Password</label><div className="relative"><Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} /><input type={showPassword ? "text" : "password"} value={adminProfile.password} onChange={e => setAdminProfile({...adminProfile, password: e.target.value})} className="w-full pl-12 pr-12 py-3.5 bg-gray-50 rounded-2xl focus:ring-4 focus:ring-red-100 outline-none font-bold text-gray-800" /><button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 transition-colors hover:text-indigo-600">{showPassword ? <EyeOff size={20} /> : <Eye size={20} />}</button></div></div></div><button type="submit" className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-lg shadow-xl hover:bg-indigo-700 transition-all active:scale-[0.98] mt-4 shadow-indigo-100 uppercase tracking-widest">SIMPAN PROFIL</button></form></div></div></div>
+  );
+}
+
+// ==========================================
+// 10. MODUL ADMIN: PENGATURAN DATABASE (BARU)
+// ==========================================
+function AppSettingsSection({ appSettings, setAppSettings, showNotification }) {
+  const handleSave = (e) => {
+    e.preventDefault();
+    showNotification("Pengaturan database berhasil disimpan!");
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-2">
+      <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 sm:p-12">
+        <div className="flex items-center gap-3 mb-10 border-b border-gray-50 pb-6 text-left">
+          <div className="bg-indigo-600 p-3 rounded-2xl text-white shadow-lg rotate-3">
+            <Database size={28} />
+          </div>
+          <div>
+            <h2 className="text-2xl font-black text-gray-900 leading-tight uppercase">Pengaturan Sistem</h2>
+            <p className="text-gray-400 text-sm font-medium italic uppercase tracking-widest">Konfigurasi Sumber Database Utama</p>
+          </div>
+        </div>
+
+        <form onSubmit={handleSave} className="space-y-8 text-left">
+          <div className="grid grid-cols-1 gap-8">
+            <div className="space-y-4">
+              <h4 className="text-xs font-black text-indigo-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                <Globe size={14} /> Link Spreadsheet / Google Drive
+              </h4>
+              <p className="text-xs text-gray-400 font-medium italic">Masukkan URL Spreadsheet yang berisi data master inventaris.</p>
+            </div>
+
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Database Kendaraan Dinas</label>
+                <input 
+                  type="url" 
+                  value={appSettings.linkDbKendaraan} 
+                  onChange={e => setAppSettings({...appSettings, linkDbKendaraan: e.target.value})} 
+                  className="w-full px-5 py-4 bg-gray-50 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold text-gray-600 shadow-inner" 
+                  placeholder="https://docs.google.com/spreadsheets/d/..."
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Database Peralatan Elektronik</label>
+                <input 
+                  type="url" 
+                  value={appSettings.linkDbElektronik} 
+                  onChange={e => setAppSettings({...appSettings, linkDbElektronik: e.target.value})} 
+                  className="w-full px-5 py-4 bg-gray-50 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold text-gray-600 shadow-inner" 
+                  placeholder="https://docs.google.com/spreadsheets/d/..."
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Database Barang Lainnya</label>
+                <input 
+                  type="url" 
+                  value={appSettings.linkDbBarangLain} 
+                  onChange={e => setAppSettings({...appSettings, linkDbBarangLain: e.target.value})} 
+                  className="w-full px-5 py-4 bg-gray-50 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold text-gray-600 shadow-inner" 
+                  placeholder="https://docs.google.com/spreadsheets/d/..."
+                />
+              </div>
+
+              <div className="space-y-2 pt-4 border-t border-gray-50">
+                <label className="text-xs font-black text-emerald-600 uppercase tracking-widest ml-1">Database Akun Pengguna</label>
+                <input 
+                  type="url" 
+                  value={appSettings.linkDbUsers} 
+                  onChange={e => setAppSettings({...appSettings, linkDbUsers: e.target.value})} 
+                  className="w-full px-5 py-4 bg-emerald-50/50 rounded-2xl focus:ring-4 focus:ring-emerald-100 outline-none font-bold text-gray-600 shadow-inner" 
+                  placeholder="https://docs.google.com/spreadsheets/d/..."
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-6">
+            <button type="submit" className="w-full bg-gray-900 text-white py-5 rounded-[2rem] font-black text-lg shadow-xl hover:bg-black transition-all active:scale-[0.98] uppercase tracking-widest flex items-center justify-center gap-3">
+              <Save size={24} /> Update Sumber Data
+            </button>
+            <p className="text-center text-[10px] text-gray-400 mt-6 uppercase font-black tracking-widest">Pastikan link dapat diakses secara publik (View Only) untuk sinkronisasi.</p>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function AssetModal({ activeAssetTab, editingItem, formData, setFormData, closeModal, handleAddOrEdit }) {
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in"><div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 max-h-[90vh] overflow-y-auto"><div className="p-8 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10"><div className="flex items-center gap-3"><div className={`p-2 rounded-xl text-white ${activeAssetTab === 'Kendaraan Dinas' ? 'bg-indigo-600' : activeAssetTab === 'Peralatan Elektronik' ? 'bg-emerald-600' : 'bg-amber-600'}`}>{activeAssetTab === 'Kendaraan Dinas' ? <Car size={24} /> : activeAssetTab === 'Peralatan Elektronik' ? <Laptop size={24} /> : <Package size={24} />}</div><h3 className="text-2xl font-black text-gray-900 uppercase tracking-tight">{editingItem ? 'Edit' : 'Tambah'} {activeAssetTab}</h3></div><button onClick={closeModal} className="p-2 hover:bg-gray-100 rounded-xl transition-colors text-gray-400"><X /></button></div>
+      <form onSubmit={handleAddOrEdit} className="p-8 space-y-6 text-left">
+        {(activeAssetTab === 'Peralatan Elektronik' || activeAssetTab === 'Barang Lain') && (<div className="space-y-2 animate-in slide-in-from-top-2"><label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-2"><Hash size={14} className="text-indigo-600" /> NUP</label><input required value={formData.nup} onChange={e => setFormData({...formData, nup: e.target.value})} className="w-full px-5 py-4 bg-gray-50 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold shadow-inner" placeholder="Contoh: LNN-2024-001" /></div>)}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6"><div className="space-y-2"><label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">{activeAssetTab === 'Peralatan Elektronik' ? 'Nama Alat' : activeAssetTab === 'Barang Lain' ? 'Nama Barang' : 'Nama Fasilitas'}</label>{activeAssetTab === 'Peralatan Elektronik' ? (<select value={formData.nama} onChange={e => setFormData({...formData, nama: e.target.value})} className="w-full px-4 py-4 bg-gray-50 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold border-none appearance-none cursor-pointer shadow-inner">{ELEKTRONIK_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}</select>) : (<input required value={formData.nama} onChange={e => setFormData({...formData, nama: e.target.value})} className="w-full px-5 py-4 bg-gray-50 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold shadow-inner" placeholder={activeAssetTab === 'Barang Lain' ? "Contoh: Tenda Camping" : "Contoh: Toyota Avanza"} />)}</div><div className="space-y-2"><label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Status</label><select value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})} className="w-full px-4 py-4 bg-gray-50 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold border-none appearance-none cursor-pointer shadow-inner"><option value="Tersedia">Tersedia</option><option value="Dipinjam">Dipinjam</option><option value="Rusak">Rusak</option></select></div></div>
+        {formData.status === 'Dipinjam' && (<div className="space-y-4 animate-in slide-in-from-top-2 p-4 bg-orange-50/50 rounded-2xl border border-orange-100"><div className="space-y-2"><label className="text-xs font-black text-orange-600 uppercase tracking-widest ml-1 flex items-center gap-1"><UserCircle size={14} /> Nama Peminjam</label><input required value={formData.peminjam} onChange={e => setFormData({...formData, peminjam: e.target.value.toUpperCase()})} className="w-full px-4 py-3 bg-white rounded-xl focus:ring-4 focus:ring-orange-100 outline-none font-bold" placeholder="NAMA LENGKAP" /></div><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><div className="space-y-2"><label className="text-xs font-black text-orange-600 uppercase tracking-widest ml-1 flex items-center gap-1"><Calendar size={14} /> Tgl Pinjam</label><input type="date" required value={formData.tglPinjam} onChange={e => setFormData({...formData, tglPinjam: e.target.value})} className="w-full px-4 py-3 bg-white rounded-xl font-bold" /></div><div className="space-y-2"><label className="text-xs font-black text-red-600 uppercase tracking-widest ml-1 flex items-center gap-1"><Clock size={14} /> Tgl Kembali</label><input type="date" required value={formData.tglKembali} onChange={e => setFormData({...formData, tglKembali: e.target.value})} className="w-full px-4 py-3 bg-white rounded-xl font-bold" /></div></div></div>)}
+        {(activeAssetTab === 'Peralatan Elektronik' || activeAssetTab === 'Barang Lain') && (<div className="space-y-2 animate-in slide-in-from-top-2"><label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-2"><Tag size={14} className="text-indigo-600" /> Merek</label><input required value={formData.merek} onChange={e => setFormData({...formData, merek: e.target.value})} className="w-full px-5 py-4 bg-gray-50 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold shadow-inner" placeholder="Merek barang..." /></div>)}
+        {formData.status === 'Rusak' && (<div className="space-y-2 animate-in slide-in-from-top-2"><label className="text-xs font-black text-red-500 uppercase tracking-widest ml-1 flex items-center gap-1"><AlertCircle size={14} /> Deskripsi Kerusakan (Wajib)</label><textarea required value={formData.deskripsiRusak} onChange={e => setFormData({...formData, deskripsiRusak: e.target.value})} className="w-full px-5 py-4 bg-red-50/50 border border-red-100 rounded-2xl focus:ring-4 focus:ring-red-100 outline-none font-bold h-24 resize-none shadow-inner" placeholder="Jelaskan detail kerusakan..." /></div>)}
+        {activeAssetTab === 'Kendaraan Dinas' && (<div className="space-y-6 pt-4 border-t border-dashed border-gray-200"><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><div className="space-y-2"><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nomor Plat</label><input required value={formData.noPlat} onChange={e => setFormData({...formData, noPlat: e.target.value})} className="w-full px-5 py-3.5 bg-gray-50 rounded-xl font-mono uppercase font-bold" /></div><div className="space-y-2"><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-1"><Gauge size={12} /> Kilometer</label><input value={formData.kilometer} onChange={e => setFormData({...formData, kilometer: e.target.value})} className="w-full px-5 py-3.5 bg-gray-50 rounded-xl font-bold" /></div></div><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><div className="space-y-2"><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nomor Rangka Mesin</label><input value={formData.noRangka} onChange={e => setFormData({...formData, noRangka: e.target.value})} className="w-full px-5 py-3.5 bg-gray-50 rounded-xl font-bold shadow-inner" placeholder="No. Rangka..." /></div><div className="space-y-2"><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nomor Mesin</label><input value={formData.noMesin} onChange={e => setFormData({...formData, noMesin: e.target.value})} className="w-full px-5 py-3.5 bg-gray-50 rounded-xl font-bold shadow-inner" placeholder="No. Mesin..." /></div></div><div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-indigo-50/30 p-4 rounded-2xl"><div className="space-y-2"><label className="text-[10px] font-black text-indigo-700 uppercase tracking-widest ml-1 text-xs">Tgl Ganti Oli</label><input type="date" value={formData.tglOliMesin} onChange={e => setFormData({...formData, tglOliMesin: e.target.value})} className="w-full px-4 py-3 bg-white rounded-xl font-bold shadow-sm" /></div><div className="space-y-2"><label className="text-[10px] font-black text-indigo-700 uppercase tracking-widest ml-1 text-xs">Berikutnya</label><input type="date" value={formData.tglOliMesinNext} onChange={e => setFormData({...formData, tglOliMesinNext: e.target.value})} className="w-full px-4 py-3 bg-white rounded-xl font-bold shadow-sm" /></div></div><div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-emerald-50/30 p-4 rounded-2xl"><div className="space-y-2"><label className="text-[10px] font-black text-emerald-700 uppercase tracking-widest ml-1 text-xs">Tgl Oli Perseneling</label><input type="date" value={formData.tglOliPerseneling} onChange={e => setFormData({...formData, tglOliPerseneling: e.target.value})} className="w-full px-4 py-3 bg-white rounded-xl font-bold shadow-sm" /></div><div className="space-y-2"><label className="text-[10px] font-black text-emerald-700 uppercase tracking-widest ml-1 text-xs">Berikutnya</label><input type="date" value={formData.tglOliPersenelingNext} onChange={e => setAppSettings({...appSettings, tglOliPersenelingNext: e.target.value})} className="w-full px-4 py-3 bg-white rounded-xl font-bold shadow-sm" /></div></div><div className="space-y-2"><label className="text-[10px] font-black text-amber-700 uppercase tracking-widest ml-1">Tgl Pajak Berikutnya</label><input type="date" value={formData.tglPajak} onChange={e => setFormData({...formData, tglPajak: e.target.value})} className="w-full px-5 py-4 bg-amber-50/50 rounded-2xl font-bold shadow-inner" /></div></div>)}
+        {(activeAssetTab !== 'Kendaraan Dinas') && (<div className="space-y-2"><label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Spesifikasi Detail</label><textarea value={formData.spek} onChange={e => setFormData({...formData, spek: e.target.value})} className="w-full px-5 py-4 bg-gray-50 rounded-2xl h-32 resize-none font-bold shadow-inner" placeholder="Ketik spesifikasi lengkap di sini..." /></div>)}
+        <div className="flex gap-4 pt-6 sticky bottom-0 bg-white border-t border-gray-50 mt-4 text-center"><button type="button" onClick={closeModal} className="flex-1 py-4 rounded-2xl font-bold uppercase tracking-widest text-xs bg-gray-100 transition-all hover:bg-gray-200 active:scale-95">Batal</button><button type="submit" className="flex-2 w-[60%] bg-indigo-600 text-white py-4 rounded-2xl font-black shadow-xl uppercase text-xs tracking-widest shadow-indigo-100 transition-all hover:bg-indigo-700 active:scale-95">Simpan Data</button></div>
+      </form></div></div>
+  );
+}
+
+function AssetDetailModal({ selectedDetailItem, closeDetailModal }) {
+  if (!selectedDetailItem) return null;
+  const isVehicle = selectedDetailItem.kategori === 'Kendaraan Dinas';
+  const isElectronic = selectedDetailItem.kategori === 'Peralatan Elektronik';
+  const isOther = selectedDetailItem.kategori === 'Barang Lain';
+  const themeColor = isVehicle ? 'bg-indigo-600' : isElectronic ? 'bg-emerald-600' : 'bg-amber-600';
+  const lightTheme = isVehicle ? 'bg-indigo-50 border-indigo-100' : isElectronic ? 'bg-emerald-50 border-emerald-100' : 'bg-amber-50 border-amber-100';
+  const textColor = isVehicle ? 'text-indigo-900' : isElectronic ? 'text-emerald-900' : 'text-amber-900';
+
+  return (
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in">
+      <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 max-h-[90vh] flex flex-col">
+        <div className={`p-8 border-b border-gray-100 flex items-center justify-between ${themeColor} text-white`}>
+          <div className="flex items-center gap-3 text-left">
+            <div className="bg-white/20 p-2 rounded-xl">
+              {isVehicle ? <Car size={24} /> : isElectronic ? <Laptop size={24} /> : <Package size={24} />}
+            </div>
+            <div>
+              <h3 className="text-xl font-black uppercase tracking-tight leading-none mb-1">Rincian Unit</h3>
+              <p className="text-white/80 text-[10px] font-medium italic uppercase tracking-widest leading-none">Informasi Aset SIKOPIFASTA</p>
+            </div>
+          </div>
+          <button onClick={closeDetailModal} className="p-2 hover:bg-white/10 rounded-xl transition-colors"><X /></button>
+        </div>
+        
+        <div className="p-8 overflow-y-auto space-y-8 text-left">
+          <div className={`flex flex-col sm:flex-row gap-6 items-start sm:items-center justify-between ${lightTheme} p-6 rounded-3xl border`}>
+            <div>
+              <h2 className={`text-3xl font-black ${textColor} uppercase leading-tight`}>{selectedDetailItem.nama}</h2>
+              <div className="flex items-center gap-2 mt-2">
+                {isVehicle ? (
+                  <div className={`${themeColor} text-white px-4 py-1 rounded-lg font-mono font-bold text-lg tracking-wider`}>{selectedDetailItem.noPlat}</div>
+                ) : (
+                  <div className={`${themeColor} text-white px-4 py-1 rounded-lg font-mono font-bold text-sm tracking-tight`}>{selectedDetailItem.nup || '-'}</div>
+                )}
+                <span className={`px-4 py-1.5 rounded-lg text-xs font-black uppercase ${selectedDetailItem.status === 'Tersedia' ? 'bg-green-500 text-white' : selectedDetailItem.status === 'Dipinjam' ? 'bg-orange-500 text-white' : 'bg-red-500 text-white'}`}>{selectedDetailItem.status}</span>
+              </div>
+            </div>
+            {isVehicle && (
+              <div className="flex flex-col items-end">
+                <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Odometer</span>
+                <div className="flex items-center gap-2 text-indigo-900"><Gauge size={20} /><span className="text-2xl font-black">{selectedDetailItem.kilometer} KM</span></div>
+              </div>
+            )}
+            {(isElectronic || isOther) && (
+              <div className="flex flex-col items-end text-right">
+                <span className={`text-[10px] font-black ${textColor} opacity-60 uppercase tracking-widest`}>Merek</span>
+                <div className={`flex items-center gap-2 ${textColor}`}><Tag size={20} /><span className="text-2xl font-black uppercase tracking-tight leading-none">{selectedDetailItem.merek || '-'}</span></div>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <h4 className={`text-sm font-black text-gray-400 uppercase tracking-widest flex items-center gap-2 border-b pb-2`}><ClipboardList size={16} /> Identitas Fisik</h4>
+              <div className="space-y-3 text-sm font-medium">
+                <div className="flex justify-between border-b pb-1"><span>ID Unit / Plat</span><span className="font-bold font-mono text-xs uppercase">{isVehicle ? selectedDetailItem.noPlat : selectedDetailItem.nup || '-'}</span></div>
+                {isVehicle && (
+                  <>
+                    <div className="flex justify-between border-b pb-1"><span>No. Rangka</span><span className="font-bold font-mono text-[10px]">{selectedDetailItem.noRangka || '-'}</span></div>
+                    <div className="flex justify-between border-b pb-1"><span>No. Mesin</span><span className="font-bold font-mono text-[10px]">{selectedDetailItem.noMesin || '-'}</span></div>
+                    <div className="flex justify-between"><span>Pajak Berikutnya</span><span className="font-bold text-amber-600 font-mono">{selectedDetailItem.tglPajak || '-'}</span></div>
+                  </>
+                )}
+                {!isVehicle && (<div className="flex justify-between border-b pb-1"><span>Merek</span><span className="font-bold uppercase text-xs">{selectedDetailItem.merek || '-'}</span></div>)}
+                <div className="flex justify-between"><span>Kategori</span><span className="font-bold text-xs uppercase">{selectedDetailItem.kategori}</span></div>
+              </div>
+            </div>
+            
+            <div className="space-y-4">
+              <h4 className={`text-sm font-black text-gray-400 uppercase tracking-widest flex items-center gap-2 border-b pb-2`}><Wrench size={16} /> {isVehicle ? 'Pemeliharaan' : 'Spesifikasi'}</h4>
+              {isVehicle ? (
+                <div className="space-y-4">
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-gray-100 text-xs">
+                    <span className="font-black text-gray-400 uppercase block mb-2 tracking-widest">Oli Mesin</span>
+                    <div className="flex justify-between text-center">
+                      <div><p className="text-gray-400 mb-0.5 font-bold uppercase text-[9px]">Terakhir</p><p className="font-bold font-mono">{selectedDetailItem.tglOliMesin || '-'}</p></div>
+                      <div className="w-px h-8 bg-gray-200"></div>
+                      <div><p className="text-indigo-500 mb-0.5 font-black uppercase text-[9px]">Jadwal Ganti</p><p className="font-bold text-indigo-700 font-mono">{selectedDetailItem.tglOliMesinNext || '-'}</p></div>
+                    </div>
+                  </div>
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-gray-100 text-xs">
+                    <span className="font-black text-gray-400 uppercase block mb-2 tracking-widest">Oli Perseneling</span>
+                    <div className="flex justify-between text-center">
+                      <div><p className="text-gray-400 mb-0.5 font-bold uppercase text-[9px]">Terakhir</p><p className="font-bold font-mono">{selectedDetailItem.tglOliPerseneling || '-'}</p></div>
+                      <div className="w-px h-8 bg-gray-200"></div>
+                      <div><p className="text-emerald-500 mb-0.5 font-black uppercase text-[9px]">Jadwal Ganti</p><p className="font-bold text-emerald-700 font-mono">{selectedDetailItem.tglOliPersenelingNext || '-'}</p></div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-slate-50 p-4 rounded-2xl border border-gray-100 min-h-[100px]">
+                  <p className="text-xs font-medium text-gray-600 leading-relaxed italic uppercase font-bold">
+                    {selectedDetailItem.spek || 'Tidak ada spesifikasi tambahan.'}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {selectedDetailItem.status === 'Dipinjam' && (
+            <div className="bg-orange-50 p-6 rounded-3xl border border-orange-100 animate-in fade-in">
+              <h4 className="text-sm font-black text-orange-700 uppercase tracking-widest mb-3 flex items-center gap-2"><UserCircle size={20} /> Informasi Peminjaman</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div><p className="text-[10px] text-orange-400 font-black uppercase tracking-wider">Nama Peminjam</p><p className="text-orange-900 font-bold text-lg uppercase leading-tight">{selectedDetailItem.peminjam}</p></div>
+                <div><p className="text-[10px] text-orange-400 font-black uppercase tracking-wider">Masa Pinjam</p><p className="text-orange-900 font-black text-xs font-mono">{selectedDetailItem.tglPinjam} s/d {selectedDetailItem.tglKembali || '-'}</p></div>
+              </div>
+            </div>
+          )}
+
+          {selectedDetailItem.status === 'Rusak' && (
+            <div className="bg-red-50 p-6 rounded-3xl border border-red-100">
+              <h4 className="text-sm font-black text-red-700 uppercase tracking-widest mb-2 flex items-center gap-2"><AlertCircle size={18} /> Catatan Kerusakan</h4>
+              <p className="text-red-800 font-medium italic uppercase text-xs leading-relaxed font-bold">"{selectedDetailItem.deskripsiRusak || 'Tidak ada deskripsi detail tersedia.'}"</p>
+            </div>
+          )}
+        </div>
+        
+        <div className="p-8 border-t border-gray-100 bg-gray-50 flex justify-end">
+          <button onClick={closeDetailModal} className={`${themeColor} text-white px-10 py-4 rounded-[1.8rem] font-black uppercase text-xs tracking-[0.2em] shadow-lg active:scale-95 transition-all`}>Tutup Rincian</button>
+        </div>
+      </div>
+    </div>
+  );
+}

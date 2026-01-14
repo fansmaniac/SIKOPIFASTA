@@ -12,37 +12,9 @@ import {
 // ==========================================
 // 1. DATA INITIAL & KONSTANTA
 // ==========================================
-const INITIAL_DATA = [
-  { 
-    id: 1, nama: 'Toyota Avanza', kategori: 'Kendaraan Dinas', status: 'Tersedia', 
-    noPlat: 'B 1234 ABC', noRangka: 'MHF12345678901234', noMesin: '2NR-FE123456',
-    kilometer: '15.420', tglOliMesin: '2023-12-01', tglOliMesinNext: '2024-06-01',
-    tglOliPerseneling: '2023-10-15', tglOliPersenelingNext: '2024-10-15',
-    tglPajak: '2024-11-20', deskripsiRusak: '', peminjam: '', usernamePeminjam: '', tglPinjam: '', tglKembali: ''
-  },
-  { 
-    id: 2, nama: 'Bus Operasional', kategori: 'Kendaraan Dinas', status: 'Dipinjam', 
-    noPlat: 'B 7001 YZ', noRangka: 'MHF987654321', noMesin: 'BUS-999',
-    kilometer: '45.000', tglOliMesin: '2023-11-01', tglOliMesinNext: '2024-05-01',
-    tglOliPerseneling: '2023-09-15', tglOliPersenelingNext: '2024-09-15',
-    tglPajak: '2025-01-10', peminjam: 'DIKI HERMAWAN', usernamePeminjam: 'diki.h', tglPinjam: '2024-01-10', tglKembali: new Date().toISOString().split('T')[0]
-  },
-  { 
-    id: 3, nama: 'Laptop/PC', kategori: 'Peralatan Elektronik', status: 'Tersedia', 
-    nup: 'ELK-001-2024', merek: 'Apple', spek: 'MacBook Pro M2, 16GB RAM, 512GB SSD', 
-    deskripsiRusak: '', peminjam: '', usernamePeminjam: '', tglPinjam: '', tglKembali: ''
-  },
-  { 
-    id: 4, nama: 'Printer', kategori: 'Peralatan Elektronik', status: 'Dipinjam', 
-    nup: 'PRN-002-2024', merek: 'Epson', spek: 'L3210 All-in-One', 
-    peminjam: 'SITI AMINAH', usernamePeminjam: 'siti.a', tglPinjam: '2024-01-12', tglKembali: '2024-12-25'
-  },
-  { 
-    id: 5, nama: 'Tenda Dome Kapasitas 4', kategori: 'Barang Lain', status: 'Tersedia', 
-    nup: 'LNN-001-2024', merek: 'Great Outdoor', spek: 'Double Layer, Frame Alloy', 
-    peminjam: '', usernamePeminjam: '', tglPinjam: '', tglKembali: '', deskripsiRusak: '' 
-  },
-];
+// Semua data simulasi telah dihapus. 
+// Sumber data kini 100% diambil dari Spreadsheet melalui menu Sistem.
+const INITIAL_DATA = [];
 
 const INITIAL_USERS = [
   {
@@ -96,6 +68,7 @@ export default function App() {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [notification, setNotification] = useState(null);
 
+  // Muat pustaka XLSX
   useEffect(() => {
     const script = document.createElement('script');
     script.src = "https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js";
@@ -106,6 +79,58 @@ export default function App() {
       if (existingScript) document.body.removeChild(existingScript);
     };
   }, []);
+
+  // Logika Sinkronisasi Data Otomatis dari Spreadsheet untuk semua kategori
+  useEffect(() => {
+    const fetchDataFromSheet = async (url, categoryLabel, prefix) => {
+      if (!url || url.trim() === '') {
+        // Hapus data kategori ini jika link dikosongkan
+        setData(prev => prev.filter(item => item.kategori !== categoryLabel));
+        return;
+      }
+
+      try {
+        const sheetIdMatch = url.match(/\/d\/([^/]+)/);
+        if (sheetIdMatch && typeof window.XLSX !== 'undefined') {
+          const sheetId = sheetIdMatch[1];
+          const exportUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=xlsx`;
+          
+          const response = await fetch(exportUrl);
+          if (!response.ok) throw new Error("Gagal akses spreadsheet");
+          
+          const arrayBuffer = await response.arrayBuffer();
+          const workbook = window.XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          const jsonData = window.XLSX.utils.sheet_to_json(worksheet);
+          
+          const mappedData = jsonData.map((item, index) => ({
+            ...item,
+            id: item.id || `fetched-${prefix}-${index}`,
+            kategori: categoryLabel,
+            status: item.status || 'Tersedia'
+          }));
+
+          setData(prev => [
+            ...prev.filter(i => i.kategori !== categoryLabel),
+            ...mappedData
+          ]);
+          
+          showNotification(`Database ${categoryLabel} Berhasil Disinkronkan!`);
+        }
+      } catch (error) {
+        showNotification(`Gagal memuat database ${categoryLabel}. Periksa link & akses.`);
+      }
+    };
+
+    const timer = setTimeout(() => {
+      fetchDataFromSheet(appSettings.linkDbKendaraan, 'Kendaraan Dinas', 'v');
+      fetchDataFromSheet(appSettings.linkDbElektronik, 'Peralatan Elektronik', 'e');
+      fetchDataFromSheet(appSettings.linkDbBarangLain, 'Barang Lain', 'b');
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [appSettings.linkDbKendaraan, appSettings.linkDbElektronik, appSettings.linkDbBarangLain]);
 
   const showNotification = (msg) => {
     setNotification(msg);
@@ -150,7 +175,7 @@ export default function App() {
       
       <main className="pb-20 flex-grow">
         {view === 'user_dashboard' && <UserDashboard setView={setView} setSelectedCategory={setSelectedCategory} exportToExcel={() => exportToExcel()} />}
-        {view === 'category_detail' && <CategoryDetail selectedCategory={selectedCategory} setView={setView} data={data} />}
+        {view === 'category_detail' && <CategoryDetail selectedCategory={selectedCategory} setView={setView} data={data} appSettings={appSettings} />}
         {view === 'login_portal' && <LoginPortal setView={setView} users={users} setCurrentUser={setCurrentUser} showNotification={showNotification} />}
         {view === 'registration_portal' && <RegistrationPortal setView={setView} users={users} setUsers={setUsers} showNotification={showNotification} />}
         {view === 'admin_panel' && currentUser?.role === 'admin' && (
@@ -292,31 +317,58 @@ function UserDashboard({ setView, setSelectedCategory, exportToExcel }) {
   );
 }
 
-function CategoryDetail({ selectedCategory, setView, data }) {
+function CategoryDetail({ selectedCategory, setView, data, appSettings }) {
   const [searchTerm, setSearchTerm] = useState('');
+  
+  const filteredItems = data.filter(item => 
+    item.kategori === selectedCategory && 
+    item.nama.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Pengecekan tautan database berdasarkan kategori
+  const isDbMissing = (selectedCategory === 'Kendaraan Dinas' && (!appSettings.linkDbKendaraan || appSettings.linkDbKendaraan.trim() === '')) ||
+                     (selectedCategory === 'Peralatan Elektronik' && (!appSettings.linkDbElektronik || appSettings.linkDbElektronik.trim() === '')) ||
+                     (selectedCategory === 'Barang Lain' && (!appSettings.linkDbBarangLain || appSettings.linkDbBarangLain.trim() === ''));
+
   return (
     <div className="p-4 sm:p-8 max-w-6xl mx-auto animate-in slide-in-from-bottom-4 duration-500">
       <div className="flex items-center gap-4 mb-8">
         <button onClick={() => setView('user_dashboard')} className="p-3 bg-white hover:bg-gray-50 rounded-2xl border border-gray-100 shadow-sm transition-all active:scale-90 text-gray-600"><ArrowLeft size={24} /></button>
         <div><h2 className="text-2xl font-black text-gray-900 mb-1 leading-none uppercase tracking-tight">{selectedCategory}</h2><p className="text-gray-500 text-sm font-medium">Temukan fasilitas yang Anda butuhkan.</p></div>
       </div>
-      <div className="relative mb-8"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={22} /><input type="text" placeholder={`Cari di ${selectedCategory}...`} className="w-full pl-12 pr-6 py-4 rounded-3xl border border-gray-200 focus:outline-none focus:ring-4 focus:ring-indigo-100 shadow-sm text-lg transition-all font-bold" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
-      <div className="grid grid-cols-1 gap-4">
-        {data.filter(item => item.kategori === selectedCategory && item.nama.toLowerCase().includes(searchTerm.toLowerCase())).map(item => (
-          <div key={item.id} className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-6 group hover:border-indigo-200 transition-all">
-            <div className="flex gap-5">
-              <div className="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-                {item.kategori === 'Kendaraan Dinas' ? <Car size={28}/> : item.kategori === 'Peralatan Elektronik' ? <Laptop size={28}/> : <Package size={28}/>}
-              </div>
-              <div><h4 className="font-bold text-gray-900 text-lg group-hover:text-indigo-700 transition-colors leading-tight uppercase">{item.nama}</h4><p className="text-sm text-gray-500 font-medium mt-1">{item.kategori === 'Kendaraan Dinas' ? item.noPlat : (item.kategori === 'Peralatan Elektronik' || item.kategori === 'Barang Lain' ? `${item.merek || ''} - ${item.nup || ''}` : item.spek)}</p></div>
+
+      {isDbMissing ? (
+        <div className="bg-white p-12 rounded-[3rem] border border-dashed border-gray-200 text-center animate-in fade-in">
+           <Database size={60} className="mx-auto text-gray-200 mb-4" />
+           <h3 className="text-xl font-black text-gray-400 uppercase tracking-tight">Database Belum Terhubung</h3>
+           <p className="text-gray-400 text-sm mt-2 font-medium italic">Hubungi administrator untuk menautkan link spreadsheet database {selectedCategory}.</p>
+        </div>
+      ) : (
+        <>
+          <div className="relative mb-8"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={22} /><input type="text" placeholder={`Cari di ${selectedCategory}...`} className="w-full pl-12 pr-6 py-4 rounded-3xl border border-gray-200 focus:outline-none focus:ring-4 focus:ring-indigo-100 shadow-sm text-lg transition-all font-bold" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
+          
+          {filteredItems.length === 0 ? (
+            <div className="p-12 text-center text-gray-400 font-bold italic">Tidak ada data ditemukan.</div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4">
+              {filteredItems.map(item => (
+                <div key={item.id} className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-6 group hover:border-indigo-200 transition-all">
+                  <div className="flex gap-5">
+                    <div className="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                      {item.kategori === 'Kendaraan Dinas' ? <Car size={28}/> : item.kategori === 'Peralatan Elektronik' ? <Laptop size={28}/> : <Package size={28}/>}
+                    </div>
+                    <div><h4 className="font-bold text-gray-900 text-lg group-hover:text-indigo-700 transition-colors leading-tight uppercase">{item.nama}</h4><p className="text-sm text-gray-500 font-medium mt-1">{item.kategori === 'Kendaraan Dinas' ? item.noPlat : (item.kategori === 'Peralatan Elektronik' || item.kategori === 'Barang Lain' ? `${item.merek || ''} - ${item.nup || ''}` : item.spek)}</p></div>
+                  </div>
+                  <div className="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-t-0 pt-4 sm:pt-0">
+                     <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${item.status === 'Tersedia' ? 'bg-green-50 text-green-700 border-green-100' : item.status === 'Dipinjam' ? 'bg-orange-50 text-orange-700 border-orange-100' : 'bg-red-50 text-red-700 border-red-100'}`}>{item.status}</span>
+                     <button onClick={() => setView('login_portal')} className="bg-indigo-600 text-white px-10 py-3 rounded-2xl text-sm font-black uppercase tracking-widest hover:bg-indigo-700 active:scale-95 shadow-lg shadow-indigo-100">Pinjam</button>
+                  </div>
+                </div>
+              ))}
             </div>
-            <div className="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-t-0 pt-4 sm:pt-0">
-               <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${item.status === 'Tersedia' ? 'bg-green-50 text-green-700 border-green-100' : item.status === 'Dipinjam' ? 'bg-orange-50 text-orange-700 border-orange-100' : 'bg-red-50 text-red-700 border-red-100'}`}>{item.status}</span>
-               <button onClick={() => setView('login_portal')} className="bg-indigo-600 text-white px-10 py-3 rounded-2xl text-sm font-black uppercase tracking-widest hover:bg-indigo-700 active:scale-95 shadow-lg shadow-indigo-100">Pinjam</button>
-            </div>
-          </div>
-        ))}
-      </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
@@ -584,7 +636,7 @@ function AdminPanel({ data, setData, users, setUsers, appSettings, setAppSetting
 
       {adminSubView === 'assets' ? (
         <AdminAssetsSection 
-          activeAssetTab={activeAssetTab} setActiveAssetTab={setActiveAssetTab} data={data} setData={setData} openModal={openModal} openDetailModal={openDetailModal} showNotification={showNotification} adminSearch={adminSearch} setAdminSearch={setAdminSearch} adminStatusFilter={adminStatusFilter} setAdminStatusFilter={setAdminStatusFilter} exportCategoryExcel={exportCategoryExcel} onImportClick={() => fileInputRef.current?.click()}
+          activeAssetTab={activeAssetTab} setActiveAssetTab={setActiveAssetTab} data={data} setData={setData} openModal={openModal} openDetailModal={openDetailModal} showNotification={showNotification} adminSearch={adminSearch} setAdminSearch={setAdminSearch} adminStatusFilter={adminStatusFilter} setAdminStatusFilter={setAdminStatusFilter} exportCategoryExcel={exportCategoryExcel} onImportClick={() => fileInputRef.current?.click()} appSettings={appSettings}
         />
       ) : adminSubView === 'users' ? (
         <AdminUsersSection 
@@ -625,9 +677,10 @@ function AdminPanel({ data, setData, users, setUsers, appSettings, setAppSetting
 // ==========================================
 // 8. MODUL ADMIN: MANAJEMEN ASET
 // ==========================================
-function AdminAssetsSection({ activeAssetTab, setActiveAssetTab, data, setData, openModal, openDetailModal, showNotification, adminSearch, setAdminSearch, adminStatusFilter, setAdminStatusFilter, exportCategoryExcel, onImportClick }) {
+function AdminAssetsSection({ activeAssetTab, setActiveAssetTab, data, setData, openModal, openDetailModal, showNotification, adminSearch, setAdminSearch, adminStatusFilter, setAdminStatusFilter, exportCategoryExcel, onImportClick, appSettings }) {
   const handleDelete = (id) => { setData(data.filter(item => item.id !== id)); showNotification("Data fasilitas dihapus."); };
   const today = new Date().toISOString().split('T')[0];
+  
   const filteredAndSortedData = data.filter(item => {
     const matchCategory = item.kategori === activeAssetTab;
     const searchString = adminSearch.toLowerCase();
@@ -639,6 +692,11 @@ function AdminAssetsSection({ activeAssetTab, setActiveAssetTab, data, setData, 
     if (a.tglKembali) return -1; if (b.tglKembali) return 1; return 0;
   });
 
+  // Pengecekan database aktif berdasarkan tab
+  const isDbMissing = (activeAssetTab === 'Kendaraan Dinas' && (!appSettings.linkDbKendaraan || appSettings.linkDbKendaraan.trim() === '')) ||
+                     (activeAssetTab === 'Peralatan Elektronik' && (!appSettings.linkDbElektronik || appSettings.linkDbElektronik.trim() === '')) ||
+                     (activeAssetTab === 'Barang Lain' && (!appSettings.linkDbBarangLain || appSettings.linkDbBarangLain.trim() === ''));
+
   return (
     <div className="animate-in fade-in">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-8 text-left">
@@ -646,8 +704,19 @@ function AdminAssetsSection({ activeAssetTab, setActiveAssetTab, data, setData, 
         <div className="flex flex-wrap gap-3"><button onClick={onImportClick} className="flex-1 sm:flex-none bg-emerald-50 text-emerald-700 border border-emerald-100 px-5 py-3 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-100 transition-all text-xs uppercase tracking-widest"><Upload size={18} /> Unggah</button><button onClick={() => exportCategoryExcel(activeAssetTab)} className="flex-1 sm:flex-none bg-blue-50 text-blue-700 border border-blue-100 px-5 py-3 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-blue-100 transition-all text-xs uppercase tracking-widest"><Download size={18} /> Unduh</button><button onClick={() => openModal()} className="flex-1 sm:flex-none bg-indigo-600 text-white px-6 py-3 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-indigo-700 shadow-xl uppercase tracking-widest text-xs"><Plus size={20} /> Tambah</button></div>
       </div>
       <div className="flex flex-wrap gap-2 mb-6 p-1.5 bg-gray-100/50 rounded-2xl w-full sm:w-max">{CATEGORIES.map((cat) => (<button key={cat.id} onClick={() => { setActiveAssetTab(cat.id); setAdminSearch(''); setAdminStatusFilter('Semua'); }} className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs transition-all uppercase tracking-wider ${activeAssetTab === cat.id ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-200/50'}`}>{cat.id === 'Kendaraan Dinas' ? <Car size={16}/> : cat.id === 'Peralatan Elektronik' ? <Laptop size={16}/> : <Package size={16}/>}{cat.id}</button>))}</div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6"><div className="md:col-span-2 relative"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} /><input type="text" placeholder={`Cari nama, plat, NUP, atau peminjam...`} className="w-full pl-12 pr-4 py-3.5 bg-white border border-gray-100 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold shadow-sm" value={adminSearch} onChange={(e) => setAdminSearch(e.target.value)} /></div><div className="relative"><Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} /><select className="w-full pl-12 pr-4 py-3.5 bg-white border border-gray-100 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold shadow-sm appearance-none cursor-pointer" value={adminStatusFilter} onChange={(e) => setAdminStatusFilter(e.target.value)}><option value="Semua">Semua Status</option><option value="Tersedia">Tersedia</option><option value="Dipinjam">Dipinjam</option><option value="Rusak">Rusak</option></select></div></div>
-      <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-left text-sm min-w-[1100px]"><thead className="bg-gray-50/50 border-b border-gray-100"><tr><th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest w-64">Detail Barang</th>{activeAssetTab === 'Kendaraan Dinas' ? (<th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest hidden md:table-cell">Plat Nomor</th>) : (activeAssetTab === 'Peralatan Elektronik' || activeAssetTab === 'Barang Lain') ? (<><th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest hidden md:table-cell">Merek</th><th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest hidden md:table-cell">NUP</th></>) : (<th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest hidden md:table-cell">Spek Singkat</th>)}<th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest">Peminjam</th><th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest">Tgl Pinjam</th><th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest">Tgl Kembali</th><th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest text-center">Status</th><th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest text-right">Aksi</th></tr></thead><tbody className="divide-y divide-gray-50">{filteredAndSortedData.map(item => { const isDueToday = item.status === 'Dipinjam' && item.tglKembali === today; return (<tr key={item.id} className={`transition-colors group ${isDueToday ? 'bg-red-50 hover:bg-red-100/50' : 'hover:bg-indigo-50/30'}`}><td className="px-6 py-5"><div className="flex items-center gap-4"><div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${isDueToday ? 'bg-red-200 text-red-700' : (item.kategori === 'Kendaraan Dinas' ? 'bg-indigo-50 text-indigo-600' : item.kategori === 'Peralatan Elektronik' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600')}`}>{item.kategori === 'Kendaraan Dinas' ? <Car size={24}/> : item.kategori === 'Peralatan Elektronik' ? <Laptop size={24}/> : <Package size={24}/>}</div><div><div className={`font-bold group-hover:text-indigo-700 transition-colors leading-tight uppercase ${isDueToday ? 'text-red-700' : 'text-gray-900'}`}>{item.nama}</div><div className="text-xs text-gray-400 font-medium mt-1">{activeAssetTab === 'Kendaraan Dinas' ? item.noPlat : (activeAssetTab === 'Peralatan Elektronik' || activeAssetTab === 'Barang Lain' ? item.merek : item.spek)}</div></div></div></td>{activeAssetTab === 'Kendaraan Dinas' ? (<td className={`px-6 py-5 hidden md:table-cell font-mono font-bold ${isDueToday ? 'text-red-600' : 'text-gray-600'}`}>{item.noPlat}</td>) : (activeAssetTab === 'Peralatan Elektronik' || activeAssetTab === 'Barang Lain') ? (<><td className={`px-6 py-5 hidden md:table-cell font-bold ${isDueToday ? 'text-red-600' : 'text-gray-600'}`}>{item.merek}</td><td className="px-6 py-5 hidden md:table-cell font-mono text-gray-500">{item.nup}</td></>) : (<td className="px-6 py-5 hidden md:table-cell text-gray-500 italic text-xs">{item.spek}</td>)}<td className="px-6 py-5 font-bold uppercase">{item.status === 'Dipinjam' ? (<div className="flex items-center gap-2"><UserCircle size={16} className={isDueToday ? 'text-red-600' : 'text-orange-500'} /><span className={isDueToday ? 'text-red-800' : 'text-gray-800'}>{item.peminjam}</span></div>) : (<span className="text-gray-300">-</span>)}</td><td className="px-6 py-5 font-medium text-gray-500">{item.status === 'Dipinjam' ? item.tglPinjam : "-"}</td><td className={`px-6 py-5 font-black ${isDueToday ? 'text-red-600 animate-pulse' : 'text-gray-600'}`}>{item.status === 'Dipinjam' ? (<div className="flex items-center gap-1"><Clock size={14} />{item.tglKembali || 'Belum diatur'}</div>) : "-"}</td><td className="px-6 py-5 text-center"><span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${isDueToday ? 'bg-red-600 text-white border-red-700' : (item.status === 'Tersedia' ? 'bg-green-50 text-green-700 border-green-100' : item.status === 'Dipinjam' ? 'bg-orange-50 text-orange-700 border-orange-100' : 'bg-red-50 text-red-700 border-red-100')}`}>{isDueToday ? 'Jatuh Tempo' : item.status}</span></td><td className="px-6 py-4 text-right"><div className="flex items-center justify-end gap-1">{(activeAssetTab === 'Kendaraan Dinas' || activeAssetTab === 'Peralatan Elektronik' || activeAssetTab === 'Barang Lain') && (<button onClick={() => openDetailModal(item)} className={`p-2.5 rounded-xl transition-all ${isDueToday ? 'text-red-600 hover:bg-red-200' : 'text-indigo-400 hover:text-indigo-700 hover:bg-indigo-50'}`} title="Rincian Detail"><FileText size={20} /></button>)}<button onClick={() => openModal(item)} className="p-2.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all" title="Edit Data"><Edit size={20} /></button><button onClick={() => handleDelete(item.id)} className="p-2.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all" title="Hapus Data"><Trash2 size={20} /></button></div></td></tr>); })}</tbody></table></div></div>
+      
+      {isDbMissing ? (
+        <div className="bg-white p-20 rounded-[3rem] border border-dashed border-gray-200 text-center">
+           <Database size={60} className="mx-auto text-gray-200 mb-4" />
+           <h3 className="text-xl font-black text-gray-300 uppercase tracking-tight">Database {activeAssetTab} Belum Terhubung</h3>
+           <p className="text-gray-400 text-sm mt-2 font-medium italic">Silakan isi link spreadsheet database di menu <span className="font-bold">Sistem</span> untuk memuat data secara otomatis.</p>
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6"><div className="md:col-span-2 relative"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} /><input type="text" placeholder={`Cari nama, plat, NUP, atau peminjam...`} className="w-full pl-12 pr-4 py-3.5 bg-white border border-gray-100 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold shadow-sm" value={adminSearch} onChange={(e) => setAdminSearch(e.target.value)} /></div><div className="relative"><Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} /><select className="w-full pl-12 pr-4 py-3.5 bg-white border border-gray-100 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold shadow-sm appearance-none cursor-pointer" value={adminStatusFilter} onChange={(e) => setAdminStatusFilter(e.target.value)}><option value="Semua">Semua Status</option><option value="Tersedia">Tersedia</option><option value="Dipinjam">Dipinjam</option><option value="Rusak">Rusak</option></select></div></div>
+          <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-left text-sm min-w-[1100px]"><thead className="bg-gray-50/50 border-b border-gray-100"><tr><th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest w-64">Detail Barang</th>{activeAssetTab === 'Kendaraan Dinas' ? (<th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest hidden md:table-cell">Plat Nomor</th>) : (activeAssetTab === 'Peralatan Elektronik' || activeAssetTab === 'Barang Lain') ? (<><th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest hidden md:table-cell">Merek</th><th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest hidden md:table-cell">NUP</th></>) : (<th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest hidden md:table-cell">Spek Singkat</th>)}<th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest">Peminjam</th><th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest">Tgl Pinjam</th><th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest">Tgl Kembali</th><th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest text-center">Status</th><th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest text-right">Aksi</th></tr></thead><tbody className="divide-y divide-gray-50">{filteredAndSortedData.map(item => { const isDueToday = item.status === 'Dipinjam' && item.tglKembali === today; return (<tr key={item.id} className={`transition-colors group ${isDueToday ? 'bg-red-50 hover:bg-red-100/50' : 'hover:bg-indigo-50/30'}`}><td className="px-6 py-5"><div className="flex items-center gap-4"><div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${isDueToday ? 'bg-red-200 text-red-700' : (item.kategori === 'Kendaraan Dinas' ? 'bg-indigo-50 text-indigo-600' : item.kategori === 'Peralatan Elektronik' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600')}`}>{item.kategori === 'Kendaraan Dinas' ? <Car size={24}/> : item.kategori === 'Peralatan Elektronik' ? <Laptop size={24}/> : <Package size={24}/>}</div><div><div className={`font-bold group-hover:text-indigo-700 transition-colors leading-tight uppercase ${isDueToday ? 'text-red-700' : 'text-gray-900'}`}>{item.nama}</div><div className="text-xs text-gray-400 font-medium mt-1">{activeAssetTab === 'Kendaraan Dinas' ? item.noPlat : (activeAssetTab === 'Peralatan Elektronik' || activeAssetTab === 'Barang Lain' ? item.merek : item.spek)}</div></div></div></td>{activeAssetTab === 'Kendaraan Dinas' ? (<td className={`px-6 py-5 hidden md:table-cell font-mono font-bold ${isDueToday ? 'text-red-600' : 'text-gray-600'}`}>{item.noPlat}</td>) : (activeAssetTab === 'Peralatan Elektronik' || activeAssetTab === 'Barang Lain') ? (<><td className={`px-6 py-5 hidden md:table-cell font-bold ${isDueToday ? 'text-red-600' : 'text-gray-600'}`}>{item.merek}</td><td className="px-6 py-5 hidden md:table-cell font-mono text-gray-500">{item.nup}</td></>) : (<td className="px-6 py-5 hidden md:table-cell text-gray-500 italic text-xs">{item.spek}</td>)}<td className="px-6 py-5 font-bold uppercase">{item.status === 'Dipinjam' ? (<div className="flex items-center gap-2"><UserCircle size={16} className={isDueToday ? 'text-red-600' : 'text-orange-500'} /><span className={isDueToday ? 'text-red-800' : 'text-gray-800'}>{item.peminjam}</span></div>) : (<span className="text-gray-300">-</span>)}</td><td className="px-6 py-5 font-medium text-gray-500">{item.status === 'Dipinjam' ? item.tglPinjam : "-"}</td><td className={`px-6 py-5 font-black ${isDueToday ? 'text-red-600 animate-pulse' : 'text-gray-600'}`}>{item.status === 'Dipinjam' ? (<div className="flex items-center gap-1"><Clock size={14} />{item.tglKembali || 'Belum diatur'}</div>) : "-"}</td><td className="px-6 py-5 text-center"><span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${isDueToday ? 'bg-red-600 text-white border-red-700' : (item.status === 'Tersedia' ? 'bg-green-50 text-green-700 border-green-100' : item.status === 'Dipinjam' ? 'bg-orange-50 text-orange-700 border-orange-100' : 'bg-red-50 text-red-700 border-red-100')}`}>{isDueToday ? 'Jatuh Tempo' : item.status}</span></td><td className="px-6 py-4 text-right"><div className="flex items-center justify-end gap-1">{(activeAssetTab === 'Kendaraan Dinas' || activeAssetTab === 'Peralatan Elektronik' || activeAssetTab === 'Barang Lain') && (<button onClick={() => openDetailModal(item)} className={`p-2.5 rounded-xl transition-all ${isDueToday ? 'text-red-600 hover:bg-red-200' : 'text-indigo-400 hover:text-indigo-700 hover:bg-indigo-50'}`} title="Rincian Detail"><FileText size={20} /></button>)}<button onClick={() => openModal(item)} className="p-2.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all" title="Edit Data"><Edit size={20} /></button><button onClick={() => handleDelete(item.id)} className="p-2.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all" title="Hapus Data"><Trash2 size={20} /></button></div></td></tr>); })}</tbody></table></div></div>
+        </>
+      )}
     </div>
   );
 }
@@ -713,7 +782,7 @@ function AdminProfileSection({ adminProfile, setAdminProfile, showNotification }
 }
 
 // ==========================================
-// 10. MODUL ADMIN: PENGATURAN DATABASE (BARU)
+// 10. MODUL ADMIN: PENGATURAN DATABASE
 // ==========================================
 function AppSettingsSection({ appSettings, setAppSettings, showNotification }) {
   const handleSave = (e) => {
@@ -740,7 +809,7 @@ function AppSettingsSection({ appSettings, setAppSettings, showNotification }) {
               <h4 className="text-xs font-black text-indigo-400 uppercase tracking-[0.2em] flex items-center gap-2">
                 <Globe size={14} /> Link Spreadsheet / Google Drive
               </h4>
-              <p className="text-xs text-gray-400 font-medium italic">Masukkan URL Spreadsheet yang berisi data master inventaris.</p>
+              <p className="text-xs text-gray-400 font-medium italic">Masukkan URL Spreadsheet master inventaris (Pastikan akses disetel ke "Siapa saja dengan link").</p>
             </div>
 
             <div className="space-y-6">
@@ -761,7 +830,7 @@ function AppSettingsSection({ appSettings, setAppSettings, showNotification }) {
                   type="url" 
                   value={appSettings.linkDbElektronik} 
                   onChange={e => setAppSettings({...appSettings, linkDbElektronik: e.target.value})} 
-                  className="w-full px-5 py-4 bg-gray-50 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold text-gray-600 shadow-inner" 
+                  className="w-full px-5 py-4 bg-gray-50 rounded-2xl focus:ring-4 focus:ring-emerald-100 outline-none font-bold text-gray-600 shadow-inner" 
                   placeholder="https://docs.google.com/spreadsheets/d/..."
                 />
               </div>
@@ -772,18 +841,18 @@ function AppSettingsSection({ appSettings, setAppSettings, showNotification }) {
                   type="url" 
                   value={appSettings.linkDbBarangLain} 
                   onChange={e => setAppSettings({...appSettings, linkDbBarangLain: e.target.value})} 
-                  className="w-full px-5 py-4 bg-gray-50 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold text-gray-600 shadow-inner" 
+                  className="w-full px-5 py-4 bg-gray-50 rounded-2xl focus:ring-4 focus:ring-amber-100 outline-none font-bold text-gray-600 shadow-inner" 
                   placeholder="https://docs.google.com/spreadsheets/d/..."
                 />
               </div>
 
-              <div className="space-y-2 pt-4 border-t border-gray-50">
+              <div className="space-y-2 pt-4 border-t border-gray-50 opacity-60">
                 <label className="text-xs font-black text-emerald-600 uppercase tracking-widest ml-1">Database Akun Pengguna</label>
                 <input 
                   type="url" 
                   value={appSettings.linkDbUsers} 
                   onChange={e => setAppSettings({...appSettings, linkDbUsers: e.target.value})} 
-                  className="w-full px-5 py-4 bg-emerald-50/50 rounded-2xl focus:ring-4 focus:ring-emerald-100 outline-none font-bold text-gray-600 shadow-inner" 
+                  className="w-full px-5 py-4 bg-emerald-50/50 rounded-2xl outline-none font-bold text-gray-600 shadow-inner" 
                   placeholder="https://docs.google.com/spreadsheets/d/..."
                 />
               </div>
@@ -792,9 +861,8 @@ function AppSettingsSection({ appSettings, setAppSettings, showNotification }) {
 
           <div className="pt-6">
             <button type="submit" className="w-full bg-gray-900 text-white py-5 rounded-[2rem] font-black text-lg shadow-xl hover:bg-black transition-all active:scale-[0.98] uppercase tracking-widest flex items-center justify-center gap-3">
-              <Save size={24} /> Update Sumber Data
+              <Save size={24} /> Simpan Semua Konfigurasi
             </button>
-            <p className="text-center text-[10px] text-gray-400 mt-6 uppercase font-black tracking-widest">Pastikan link dapat diakses secara publik (View Only) untuk sinkronisasi.</p>
           </div>
         </form>
       </div>

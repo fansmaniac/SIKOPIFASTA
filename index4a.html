@@ -426,19 +426,25 @@ function UserDashboard({ setView, setSelectedCategory, exportToExcel }) {
 
 function CategoryDetail({ selectedCategory, setView, data, appSettings, currentUser, showNotification }) {
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('Semua');
+  
   const filteredItems = data.filter(item => 
     item.kategori === selectedCategory && 
-    item.nama.toLowerCase().includes(searchTerm.toLowerCase())
+    item.nama.toLowerCase().includes(searchTerm.toLowerCase()) &&
+    (statusFilter === 'Semua' ? true : item.status === statusFilter)
   );
+
   const isDbMissing = (selectedCategory === 'Kendaraan Dinas' && (!appSettings.linkDbKendaraan || appSettings.linkDbKendaraan.trim() === '')) ||
                      (selectedCategory === 'Peralatan Elektronik' && (!appSettings.linkDbElektronik || appSettings.linkDbElektronik.trim() === '')) ||
                      (selectedCategory === 'Barang Lain' && (!appSettings.linkDbBarangLain || appSettings.linkDbBarangLain.trim() === ''));
+
   return (
     <div className="p-4 sm:p-8 max-w-6xl mx-auto animate-in slide-in-from-bottom-4 duration-500">
       <div className="flex items-center gap-4 mb-8">
         <button onClick={() => setView('user_dashboard')} className="p-3 bg-white hover:bg-gray-50 rounded-2xl border border-gray-100 shadow-sm transition-all active:scale-90 text-gray-600"><ArrowLeft size={24} /></button>
         <div><h2 className="text-2xl font-black text-gray-900 mb-1 leading-none uppercase tracking-tight">{selectedCategory}</h2><p className="text-gray-500 text-sm font-medium">Temukan fasilitas yang Anda butuhkan.</p></div>
       </div>
+
       {isDbMissing && data.filter(i => i.kategori === selectedCategory).length === 0 ? (
         <div className="bg-white p-12 rounded-[3rem] border border-dashed border-gray-200 text-center animate-in fade-in">
            <Database size={60} className="mx-auto text-gray-200 mb-4" />
@@ -447,7 +453,31 @@ function CategoryDetail({ selectedCategory, setView, data, appSettings, currentU
         </div>
       ) : (
         <>
-          <div className="relative mb-8"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={22} /><input type="text" placeholder={`Cari di ${selectedCategory}...`} className="w-full pl-12 pr-6 py-4 rounded-3xl border border-gray-200 focus:outline-none focus:ring-4 focus:ring-indigo-100 shadow-sm text-lg transition-all font-bold" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
+          <div className="flex flex-col md:flex-row gap-4 mb-8">
+            <div className="relative flex-grow">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={22} />
+              <input 
+                type="text" 
+                placeholder={`Cari di ${selectedCategory}...`} 
+                className="w-full pl-12 pr-6 py-4 rounded-3xl border border-gray-200 focus:outline-none focus:ring-4 focus:ring-indigo-100 shadow-sm text-lg transition-all font-bold" 
+                value={searchTerm} 
+                onChange={(e) => setSearchTerm(e.target.value)} 
+              />
+            </div>
+            <div className="relative min-w-[200px]">
+              <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+              <select 
+                className="w-full pl-12 pr-6 py-4 rounded-3xl border border-gray-200 focus:outline-none focus:ring-4 focus:ring-indigo-100 shadow-sm text-lg transition-all font-bold appearance-none bg-white cursor-pointer"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                <option value="Semua">Semua Status</option>
+                <option value="Tersedia">Tersedia</option>
+                <option value="Dipinjam">Dipinjam</option>
+              </select>
+            </div>
+          </div>
+          
           {filteredItems.length === 0 ? (
             <div className="p-12 text-center text-gray-400 font-bold italic">Tidak ada data ditemukan.</div>
           ) : (

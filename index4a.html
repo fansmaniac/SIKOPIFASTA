@@ -37,6 +37,8 @@ const INITIAL_DATA = [
     kilometer: '15420',
     tglOliMesin: '2025-12-01',
     tglOliMesinNext: '2026-06-01',
+    tglOliPerseneling: '2025-10-15',
+    tglOliPersenelingNext: '2026-10-15',
     tglPajak: '2026-05-10',
     spek: 'Warna Hitam, Transmisi Otomatis'
   },
@@ -56,10 +58,11 @@ const INITIAL_DATA = [
   {
     id: 'dummy-b-1',
     nama: 'PROYEKTOR RUANG RAPAT',
-    merek: 'Epson EB-X05',
+    merek: 'Epson',
     nup: 'BL-2024-005',
     kategori: 'Barang Lain',
-    status: 'Tersedia',
+    status: 'Rusak',
+    deskripsiRusak: 'Lampu proyektor redup dan berkedip setelah 10 menit penggunaan.',
     spek: '3300 Lumens, HDMI, VGA, Termasuk Tas'
   }
 ];
@@ -337,17 +340,8 @@ function StatCard({ label, count, icon, color, isActive, onClick }) {
 }
 
 function UserProfileModal({ currentUser, setCurrentUser, onClose, showNotification, db, appId }) {
-  const [formData, setFormData] = useState({
-    nama: currentUser.nama,
-    nip: currentUser.nip || '',
-    email: currentUser.email || '',
-    whatsapp: currentUser.whatsapp || '',
-    username: currentUser.username,
-    password: currentUser.password,
-    confirmPassword: currentUser.password
-  });
+  const [formData, setFormData] = useState({ nama: currentUser.nama, nip: currentUser.nip || '', email: currentUser.email || '', whatsapp: currentUser.whatsapp || '', username: currentUser.username, password: currentUser.password, confirmPassword: currentUser.password });
   const [showPass, setShowPass] = useState(false);
-
   const handleUpdate = async (e) => {
     e.preventDefault();
     if (formData.password !== formData.confirmPassword) { showNotification("Konfirmasi kata sandi tidak cocok!"); return; }
@@ -360,28 +354,15 @@ function UserProfileModal({ currentUser, setCurrentUser, onClose, showNotificati
       onClose();
     } catch (err) { showNotification("Gagal memperbarui profil."); }
   };
-
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in">
       <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-xl overflow-hidden animate-in zoom-in-95 max-h-[95vh] overflow-y-auto">
-        <div className="p-8 border-b border-gray-100 flex items-center justify-between bg-white sticky top-0 z-10 text-left">
-          <div className="flex items-center gap-3"><div className="bg-indigo-100 p-2 rounded-xl text-indigo-600"><User size={24} /></div><h3 className="text-2xl font-black text-gray-900 uppercase tracking-tight">Pengaturan Profil</h3></div>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-xl transition-colors"><X /></button>
-        </div>
+        <div className="p-8 border-b border-gray-100 flex items-center justify-between bg-white sticky top-0 z-10 text-left"><div className="flex items-center gap-3"><div className="bg-indigo-100 p-2 rounded-xl text-indigo-600"><User size={24} /></div><h3 className="text-2xl font-black text-gray-900 uppercase tracking-tight">Pengaturan Profil</h3></div><button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-xl transition-colors"><X /></button></div>
         <form onSubmit={handleUpdate} className="p-8 space-y-5 text-left">
           <div className="space-y-2"><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nama Lengkap</label><input required value={formData.nama} onChange={e => setFormData({...formData, nama: e.target.value.toUpperCase()})} className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl outline-none font-bold uppercase" /></div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2"><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">NIP</label><input required value={formData.nip} onChange={e => setFormData({...formData, nip: e.target.value})} className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl outline-none font-bold" /></div>
-            <div className="space-y-2"><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Username</label><input disabled value={formData.username} className="w-full px-5 py-4 bg-gray-200 border-none rounded-2xl font-bold text-gray-500 cursor-not-allowed" /></div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2"><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Email</label><input required value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl outline-none font-bold" /></div>
-            <div className="space-y-2"><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">WhatsApp</label><input required value={formData.whatsapp} onChange={e => setFormData({...formData, whatsapp: e.target.value})} className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl outline-none font-bold" /></div>
-          </div>
-          <div className="grid grid-cols-2 gap-4 pt-4 border-t">
-            <div className="space-y-2"><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Sandi Baru</label><div className="relative"><input required type={showPass ? "text" : "password"} value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className="w-full pl-5 pr-12 py-4 bg-gray-50 border-none rounded-2xl outline-none font-bold" /><button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 transition-colors hover:text-indigo-600">{showPass ? <EyeOff size={18}/> : <Eye size={18}/>}</button></div></div>
-            <div className="space-y-2"><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Konfirmasi Sandi</label><input required type={showPass ? "text" : "password"} value={formData.confirmPassword} onChange={e => setFormData({...formData, confirmPassword: e.target.value})} className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl outline-none font-bold" /></div>
-          </div>
+          <div className="grid grid-cols-2 gap-4"><div className="space-y-2"><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">NIP</label><input required value={formData.nip} onChange={e => setFormData({...formData, nip: e.target.value})} className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl outline-none font-bold" /></div><div className="space-y-2"><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Username</label><input disabled value={formData.username} className="w-full px-5 py-4 bg-gray-200 border-none rounded-2xl font-bold text-gray-500 cursor-not-allowed" /></div></div>
+          <div className="grid grid-cols-2 gap-4"><div className="space-y-2"><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Email</label><input required value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl outline-none font-bold" /></div><div className="space-y-2"><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">WhatsApp</label><input required value={formData.whatsapp} onChange={e => setFormData({...formData, whatsapp: e.target.value})} className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl outline-none font-bold" /></div></div>
+          <div className="grid grid-cols-2 gap-4 pt-4 border-t"><div className="space-y-2"><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Sandi Baru</label><div className="relative"><input required type={showPass ? "text" : "password"} value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className="w-full pl-5 pr-12 py-4 bg-gray-50 border-none rounded-2xl outline-none font-bold" /><button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 transition-colors hover:text-indigo-600">{showPass ? <EyeOff size={18}/> : <Eye size={18}/>}</button></div></div><div className="space-y-2"><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Konfirmasi Sandi</label><input required type={showPass ? "text" : "password"} value={formData.confirmPassword} onChange={e => setFormData({...formData, confirmPassword: e.target.value})} className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl outline-none font-bold" /></div></div>
           <div className="flex gap-4 pt-6 border-t"><button type="button" onClick={onClose} className="flex-1 py-4 bg-gray-100 rounded-2xl font-bold">Batal</button><button type="submit" className="flex-1 bg-indigo-600 text-white py-4 rounded-2xl font-black">Simpan</button></div>
         </form>
       </div>
@@ -473,8 +454,8 @@ function CategoryDetail({ selectedCategory, setView, data, appSettings, currentU
       </div>
       <StatusInfographic stats={stats} currentFilter={statusFilter} onFilterChange={setStatusFilter} />
       <div className="flex flex-col md:flex-row gap-4 mb-8">
-        <div className="relative flex-grow"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={22} /><input type="text" placeholder={`Cari di ${selectedCategory}...`} className="w-full pl-12 pr-6 py-4 rounded-3xl border border-gray-200 focus:outline-none focus:ring-4 focus:ring-indigo-100 shadow-sm text-lg transition-all font-bold" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
-        <div className="relative min-w-[200px]"><Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} /><select className="w-full pl-12 pr-6 py-4 rounded-3xl border border-gray-200 focus:outline-none focus:ring-4 focus:ring-indigo-100 shadow-sm text-lg transition-all font-bold appearance-none bg-white cursor-pointer" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}><option value="Semua">Semua Status</option><option value="Tersedia">Tersedia</option><option value="Dipinjam">Dipinjam</option><option value="Rusak">Rusak</option></select></div>
+        <div className="relative flex-grow"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={22} /><input type="text" placeholder={`Cari di ${selectedCategory}...`} className="w-full pl-12 pr-6 py-4 rounded-3xl border border-gray-100 shadow-sm text-lg transition-all font-bold" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
+        <div className="relative min-w-[200px]"><Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} /><select className="w-full pl-12 pr-6 py-4 rounded-3xl border border-gray-100 shadow-sm text-lg transition-all font-bold appearance-none bg-white cursor-pointer" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}><option value="Semua">Semua Status</option><option value="Tersedia">Tersedia</option><option value="Dipinjam">Dipinjam</option><option value="Rusak">Rusak</option></select></div>
       </div>
       {filteredItems.length === 0 ? <div className="p-12 text-center text-gray-400 font-bold italic">Tidak ada data ditemukan.</div> : (
         <div className="grid grid-cols-1 gap-4">
@@ -577,7 +558,18 @@ function AdminPanel({ data, setData, users, setUsers, appSettings, setAppSetting
   const [formData, setFormData] = useState({ nama: '', kategori: '', status: 'Tersedia', spek: '', noPlat: '', noRangka: '', noMesin: '', kilometer: '', tglOliMesin: '', tglOliMesinNext: '', tglOliPerseneling: '', tglOliPersenelingNext: '', tglPajak: '', deskripsiRusak: '', nup: '', merek: '', peminjam: '', usernamePeminjam: '', tglPinjam: '', tglKembali: '' });
   const [userFormData, setUserFormData] = useState({ nama: '', nip: '', email: '', whatsapp: '', username: '', password: '' });
   const [addUserFormData, setAddUserFormData] = useState({ nama: '', nip: '', email: '', whatsapp: '', username: '' });
-  const openModal = (item = null) => { if (item) { setEditingItem(item); setFormData(item); } else { setEditingItem(null); setFormData({ nama: activeAssetTab === 'Peralatan Elektronik' ? ELEKTRONIK_OPTIONS[0] : '', kategori: activeAssetTab, status: 'Tersedia', spek: '', noPlat: '', noRangka: '', noMesin: '', kilometer: '', tglOliMesin: '', tglOliMesinNext: '', tglOliPerseneling: '', tglOliPersenelingNext: '', tglPajak: '', deskripsiRusak: '', nup: '', merek: '', peminjam: '', usernamePeminjam: '', tglPinjam: '', tglKembali: '' }); } setIsModalOpen(true); };
+
+  const openModal = (item = null) => { 
+    if (item) { 
+      setEditingItem(item); 
+      setFormData({ ...item, status: item.status || 'Tersedia' }); 
+    } else { 
+      setEditingItem(null); 
+      setFormData({ nama: activeAssetTab === 'Peralatan Elektronik' ? ELEKTRONIK_OPTIONS[0] : '', kategori: activeAssetTab, status: 'Tersedia', spek: '', noPlat: '', noRangka: '', noMesin: '', kilometer: '', tglOliMesin: '', tglOliMesinNext: '', tglOliPerseneling: '', tglOliPersenelingNext: '', tglPajak: '', deskripsiRusak: '', nup: '', merek: '', peminjam: '', usernamePeminjam: '', tglPinjam: '', tglKembali: '' }); 
+    } 
+    setIsModalOpen(true); 
+  };
+
   const closeModal = () => { setIsModalOpen(false); setEditingItem(null); };
   const openDetailModal = (item) => { setSelectedDetailItem(item); setIsDetailModalOpen(true); };
   const closeDetailModal = () => { setIsDetailModalOpen(false); setSelectedDetailItem(null); };
@@ -614,7 +606,7 @@ function AdminPanel({ data, setData, users, setUsers, appSettings, setAppSetting
       )}
       <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx, .xls, .csv" onChange={(e) => { const file = e.target.files[0]; if (!file || typeof window.XLSX === 'undefined') return; const reader = new FileReader(); reader.onload = (evt) => { const wb = window.XLSX.read(evt.target.result, { type: 'binary' }); const ws = wb.Sheets[wb.SheetNames[0]]; const importedData = window.XLSX.utils.sheet_to_json(ws); const otherCategoriesData = data.filter(item => item.kategori !== activeAssetTab); const newCategoryData = importedData.map((item, idx) => ({ ...item, id: item.id || Date.now() + idx, kategori: activeAssetTab })); setData([...otherCategoriesData, ...newCategoryData]); showNotification(`Unggah data ke ${activeAssetTab} berhasil!`); e.target.value = null; }; reader.readAsBinaryString(file); }} />
       <input type="file" ref={userFileInputRef} className="hidden" accept=".xlsx, .xls, .csv" onChange={onImportUsersExcel} />
-      {isAddUserModalOpen && <AddUserModal onSubmit={handleAddUserSubmit} users={users} onClose={() => setIsAddUserModalOpen(false)} formData={addUserFormData} setFormData={setAddUserFormData} />}
+      {isAddUserModalOpen && <AddUserModal onSubmit={(e) => { e.preventDefault(); if (users.some(u => u.username === addUserFormData.username)) { showNotification("Username sudah ada!"); return; } try { const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', addUserFormData.username); setDoc(userRef, { ...addUserFormData, id: Date.now().toString(), password: 'password123', role: 'user', historyTerlambat: 0, historyRusak: 0, foto: null, nama: addUserFormData.nama.toUpperCase() }); setIsAddUserModalOpen(false); setAddUserFormData({ nama: '', nip: '', email: '', whatsapp: '', username: '' }); showNotification(`Pengguna ${addUserFormData.nama} ditambahkan!`); } catch (err) { console.error(err); } }} users={users} onClose={() => setIsAddUserModalOpen(false)} formData={addUserFormData} setFormData={setAddUserFormData} />}
       {isUserModalOpen && <EditUserModal onClose={() => setIsUserModalOpen(false)} formData={userFormData} setFormData={setUserFormData} editingUser={editingUser} db={db} appId={appId} showNotification={showNotification} />}
       {isModalOpen && <AssetModal activeAssetTab={activeAssetTab} editingItem={editingItem} formData={formData} setFormData={setFormData} closeModal={closeModal} handleAddOrEdit={handleAddOrEdit} />}
       {isDetailModalOpen && <AssetDetailModal selectedDetailItem={selectedDetailItem} closeDetailModal={closeDetailModal} />}
@@ -625,8 +617,6 @@ function AdminPanel({ data, setData, users, setUsers, appSettings, setAppSetting
 // ============= SUB COMPONENT DEFINITIONS =============
 
 function AdminAssetsSection({ activeAssetTab, setActiveAssetTab, data, setData, openModal, openDetailModal, showNotification, adminSearch, setAdminSearch, adminStatusFilter, setAdminStatusFilter, exportCategoryExcel, onImportClick, appSettings }) {
-  const handleDelete = (id) => { setData(data.filter(item => item.id !== id)); showNotification("Data fasilitas dihapus."); };
-  const today = new Date().toISOString().split('T')[0];
   const categoryData = data.filter(item => item.kategori === activeAssetTab);
   const stats = { total: categoryData.length, available: categoryData.filter(i => i.status === 'Tersedia').length, borrowed: categoryData.filter(i => i.status === 'Dipinjam').length, damaged: categoryData.filter(i => i.status === 'Rusak').length };
   const filteredAndSortedData = categoryData.filter(item => {
@@ -644,53 +634,21 @@ function AdminAssetsSection({ activeAssetTab, setActiveAssetTab, data, setData, 
       <div className="flex flex-wrap gap-2 mb-6 p-1.5 bg-gray-100/50 rounded-2xl w-full sm:w-max">{CATEGORIES.map((cat) => (<button key={cat.id} onClick={() => { setActiveAssetTab(cat.id); setAdminSearch(''); setAdminStatusFilter('Semua'); }} className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs transition-all uppercase tracking-wider ${activeAssetTab === cat.id ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-200/50'}`}>{cat.id === 'Kendaraan Dinas' ? <Car size={16}/> : cat.id === 'Peralatan Elektronik' ? <Laptop size={16}/> : <Package size={16}/>}{cat.id}</button>))}</div>
       <StatusInfographic stats={stats} currentFilter={adminStatusFilter} onFilterChange={setAdminStatusFilter} />
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6"><div className="md:col-span-2 relative"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} /><input type="text" placeholder={`Cari nama, plat, NUP, atau peminjam...`} className="w-full pl-12 pr-4 py-3.5 bg-white border border-gray-100 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold shadow-sm" value={adminSearch} onChange={(e) => setAdminSearch(e.target.value)} /></div><div className="relative"><Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} /><select className="w-full pl-12 pr-4 py-3.5 bg-white border border-gray-100 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold shadow-sm appearance-none cursor-pointer" value={adminStatusFilter} onChange={(e) => setAdminStatusFilter(e.target.value)}><option value="Semua">Semua Status</option><option value="Tersedia">Tersedia</option><option value="Dipinjam">Dipinjam</option><option value="Rusak">Rusak</option></select></div></div>
-      <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-left text-sm min-w-[1100px]"><thead className="bg-gray-50/50 border-b border-gray-100"><tr><th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest w-64">Detail Barang</th><th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest">Peminjam</th><th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest">Tgl Kembali</th><th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest text-center">Status</th><th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest text-right">Aksi</th></tr></thead><tbody className="divide-y divide-gray-50">{filteredAndSortedData.map(item => (<tr key={item.id} className="hover:bg-slate-50 transition-colors"><td className="px-6 py-5 flex items-center gap-4"><div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">{item.kategori === 'Kendaraan Dinas' ? <Car size={20}/> : item.kategori === 'Peralatan Elektronik' ? <Laptop size={20}/> : <Package size={20}/>}</div><div><div className="font-bold text-gray-900 uppercase">{item.nama}</div><div className="text-[10px] text-gray-400">{item.noPlat || item.nup}</div></div></td><td className="px-6 py-5 font-medium">{item.peminjam || '-'}</td><td className="px-6 py-5 font-black text-gray-600">{item.tglKembali || '-'}</td><td className="px-6 py-5 text-center"><span className={`px-4 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${item.status === 'Tersedia' ? 'bg-green-50 text-green-700' : 'bg-orange-50 text-orange-700'}`}>{item.status}</span></td><td className="px-6 py-4 text-right flex justify-end gap-2"><button onClick={() => openDetailModal(item)} className="p-2 text-indigo-400 hover:bg-indigo-50 rounded-lg"><FileText size={18}/></button><button onClick={() => openModal(item)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-lg"><Edit size={18}/></button><button onClick={() => handleDelete(item.id)} className="p-2 text-red-400 hover:bg-red-50 rounded-lg"><Trash2 size={18}/></button></td></tr>))}</tbody></table></div></div>
+      <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-left text-sm min-w-[1100px]"><thead className="bg-gray-50/50 border-b border-gray-100"><tr><th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest w-64">Detail Barang</th><th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest">Peminjam</th><th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest text-center">Status</th><th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest text-right">Aksi</th></tr></thead><tbody className="divide-y divide-gray-50">{filteredAndSortedData.map(item => (<tr key={item.id} className="hover:bg-slate-50 transition-colors"><td className="px-6 py-5 flex items-center gap-4"><div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">{item.kategori === 'Kendaraan Dinas' ? <Car size={20}/> : item.kategori === 'Peralatan Elektronik' ? <Laptop size={20}/> : <Package size={20}/>}</div><div><div className="font-bold text-gray-900 uppercase">{item.nama}</div><div className="text-[10px] text-gray-400">{item.noPlat || item.nup}</div></div></td><td className="px-6 py-5 font-medium">{item.peminjam || '-'}</td><td className="px-6 py-5 text-center"><span className={`px-4 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${item.status === 'Tersedia' ? 'bg-green-50 text-green-700' : 'bg-orange-50 text-orange-700'}`}>{item.status}</span></td><td className="px-6 py-4 text-right flex justify-end gap-2"><button onClick={() => openDetailModal(item)} className="p-2 text-indigo-400 hover:bg-indigo-50 rounded-lg"><FileText size={18}/></button><button onClick={() => openModal(item)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-lg"><Edit size={18}/></button><button onClick={() => setData(prev => prev.filter(i => i.id !== item.id))} className="p-2 text-red-400 hover:bg-red-50 rounded-lg"><Trash2 size={18}/></button></td></tr>))}</tbody></table></div></div>
     </div>
   );
 }
 
-function AdminUsersSection({ users, data, userSearch, setUserSearch, onAddClick, onEdit, onReset, onDelete, onExportUsers, onImportUsers }) {
-  const calculateRating = (late, damaged) => { if (late > 8 || damaged >= 8) return 1; if (late > 6 || damaged > 6) return 2; if (late > 3 || damaged > 3) return 3; if (late >= 1 || damaged >= 1) return 4; return 5; };
-  const getUserBorrowInfo = (username) => data.find(item => item.status === 'Dipinjam' && (item.usernamePeminjam === username || item.peminjam === username));
-  const filteredSortedUsers = users.filter(u => { const borrow = getUserBorrowInfo(u.username); const searchString = userSearch.toLowerCase(); return u.nama.toLowerCase().includes(searchString) || (borrow && borrow.nama.toLowerCase().includes(searchString)); }).sort((a, b) => { const bA = getUserBorrowInfo(a.username); const bB = getUserBorrowInfo(b.username); if (bA && bB) return bA.tglKembali.localeCompare(bB.tglKembali); if (bA) return -1; if (bB) return 1; return 0; });
+function AddUserModal({ onSubmit, users, onClose, formData, setFormData }) {
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-2 text-left">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
-        <div className="uppercase tracking-tight"><h2 className="text-2xl font-black text-gray-900 mb-1">Kedisiplinan Pengguna</h2><p className="text-gray-400 text-sm font-medium italic lowercase">Monitoring rekam jejak penggunaan fasilitas kantor.</p></div>
-        <div className="flex flex-wrap gap-3"><button onClick={onImportUsers} className="bg-emerald-50 text-emerald-700 border border-emerald-100 px-5 py-4 rounded-[1.8rem] font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 hover:bg-emerald-100 transition-all active:scale-95 shadow-sm"><Upload size={16} /> Unggah Data</button><button onClick={onExportUsers} className="bg-blue-50 text-blue-700 border border-blue-100 px-5 py-4 rounded-[1.8rem] font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 hover:bg-blue-100 transition-all active:scale-95 shadow-sm"><Download size={16} /> Unduh Data</button><button onClick={onAddClick} className="bg-indigo-600 text-white px-8 py-4 rounded-[1.8rem] font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95"><UserPlus size={18} /> Tambah Pengguna</button></div>
-      </div>
-      <div className="relative mb-8"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} /><input type="text" placeholder="Cari Nama Pengguna atau Nama Barang yang sedang dipinjam..." className="w-full pl-12 pr-6 py-4 bg-white border border-gray-100 rounded-3xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold shadow-sm transition-all" value={userSearch} onChange={(e) => setUserSearch(e.target.value)} /></div>
-      <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-left text-sm min-w-[1200px]"><thead className="bg-gray-50/50 border-b border-gray-100"><tr><th className="px-6 py-5 font-black text-gray-400 uppercase tracking-widest">Pengguna</th><th className="px-6 py-5 font-black text-gray-400 uppercase tracking-widest">Identitas NIP</th><th className="px-6 py-5 font-black text-gray-400 uppercase tracking-widest">Pinjaman Aktif</th><th className="px-6 py-5 font-black text-gray-400 uppercase tracking-widest text-center">Rating</th><th className="px-6 py-5 font-black text-gray-400 uppercase tracking-widest text-right">Aksi Akun</th></tr></thead><tbody className="divide-y divide-gray-50">{filteredSortedUsers.map(u => { const borrow = getUserBorrowInfo(u.username); const rating = calculateRating(u.historyTerlambat, u.historyRusak); const isVBad = rating === 1; const isMaster = u.username === 'admin'; return (<tr key={u.id} className={`transition-all ${isVBad ? 'bg-red-50 hover:bg-red-100/50' : 'hover:bg-indigo-50/20'}`}><td className="px-6 py-5"><div className="flex items-center gap-4"><div className="w-12 h-12 rounded-full bg-gray-100 border border-gray-200 overflow-hidden shrink-0 shadow-inner">{u.foto ? <img src={u.foto} alt="P" className="w-full h-full object-cover" /> : <UserCircle size={28} className="mx-auto mt-2 text-gray-300" />}</div><div><p className="font-black text-gray-900 leading-tight uppercase mb-0.5">{u.nama} {isMaster && <span className="text-[8px] bg-indigo-600 text-white px-1.5 py-0.5 rounded-full ml-1">MASTER</span>}</p><p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">@{u.username}</p></div></div></td><td className="px-6 py-5"><p className="text-[10px] font-black text-indigo-400 tracking-widest uppercase">NIP: {u.nip}</p></td><td className="px-6 py-5">{borrow ? (<div className="flex items-center gap-2 text-indigo-600 bg-indigo-50 px-4 py-2 rounded-xl font-black uppercase border border-indigo-100 w-max"><Package size={16} /><span>{borrow.nama}</span></div>) : <span className="text-gray-300 italic font-medium">Nihil</span>}</td><td className="px-6 py-5"><div className="flex flex-col items-center"><div className="flex gap-1">{[1,2,3,4,5].map(s => (<Star key={s} size={16} fill={s <= rating ? (isVBad ? "#ef4444" : "#f59e0b") : "none"} stroke={s <= rating ? (isVBad ? "#ef4444" : "#f59e0b") : "#d1d5db"} />))}</div><p className={`text-[9px] font-black mt-2 uppercase tracking-widest ${isVBad ? 'text-red-600' : 'text-gray-400'}`}>L: {u.historyTerlambat} | R: {u.historyRusak}</p></div></td><td className="px-6 py-5 text-right"><div className="flex items-center justify-end gap-1.5"><button onClick={() => onReset(u)} className="p-2.5 text-amber-500 hover:bg-amber-50 rounded-xl transition-all border border-transparent hover:border-amber-100" title="Reset Password"><RotateCcw size={20}/></button><button onClick={() => onEdit(u)} className="p-2.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all border border-transparent hover:border-indigo-100"><Edit size={20}/></button><button onClick={() => !isMaster && onDelete(u)} className={`p-2.5 rounded-xl transition-all border border-transparent ${isMaster ? 'text-gray-200 cursor-not-allowed' : 'text-gray-400 hover:text-red-600 hover:bg-red-50 hover:border-red-100'}`} disabled={isMaster}><Trash2 size={20}/></button></div></td></tr>); })}</tbody></table></div></div>
-    </div>
-  );
-}
-
-function AdminProfileSection({ adminProfile, setAdminProfile, showNotification }) {
-  const [showPassword, setShowPassword] = useState(false);
-  const handlePhotoChange = (e) => { const file = e.target.files[0]; if (file) { const reader = new FileReader(); reader.onloadend = () => { setAdminProfile({ ...adminProfile, foto: reader.result }); showNotification("Foto profil diperbarui!"); }; reader.readAsDataURL(file); } };
-  const handleSave = (e) => { e.preventDefault(); showNotification("Perubahan profil berhasil disimpan!"); };
-  return (
-    <div className="max-w-4xl mx-auto animate-in fade-in"><div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden"><div className="bg-indigo-600 h-32 relative"><div className="absolute -bottom-12 left-8 border-4 border-white rounded-[2.5rem] shadow-xl overflow-hidden bg-white group cursor-pointer transition-transform hover:scale-105"><img src={adminProfile.foto || 'https://via.placeholder.com/150'} alt="Admin" className="w-28 h-28 object-cover" /><label className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity cursor-pointer"><Camera size={24} /><input type="file" className="hidden" accept="image/*" onChange={handlePhotoChange} /></label></div></div><div className="pt-16 px-8 pb-10"><div className="flex items-center gap-3 mb-8 border-b border-gray-50 pb-4 text-left"><Settings className="text-indigo-600" size={28} /><div><h2 className="text-2xl font-black text-gray-900 leading-tight uppercase">Pengaturan Profil</h2><p className="text-gray-400 text-sm font-medium italic uppercase tracking-widest">Akun Kendali SIKOPIFASTA</p></div></div><form onSubmit={handleSave} className="space-y-8 text-left"><div className="grid grid-cols-1 md:grid-cols-2 gap-6"><div className="md:col-span-2"><h4 className="text-xs font-black text-indigo-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-2"><User size={14} /> Identitas Pegawai</h4></div><div className="space-y-2"><label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Nama Lengkap</label><input required value={adminProfile.nama} onChange={e => setAdminProfile({...adminProfile, nama: e.target.value.toUpperCase()})} className="w-full px-5 py-3.5 bg-gray-50 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold text-gray-800" /></div><div className="space-y-2"><label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">NIP</label><input required value={adminProfile.nip} onChange={e => setAdminProfile({...adminProfile, nip: e.target.value})} className="w-full px-5 py-3.5 bg-gray-50 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold" /></div><div className="space-y-2"><label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-1"><Mail size={12} /> Email</label><input type="email" required value={adminProfile.email} onChange={e => setAdminProfile({...adminProfile, email: e.target.value})} className="w-full px-5 py-3.5 bg-gray-50 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold" /></div><div className="space-y-2"><label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-1"><Phone size={12} /> WhatsApp</label><input type="tel" required value={adminProfile.whatsapp} onChange={e => setAdminProfile({...adminProfile, whatsapp: e.target.value})} className="w-full px-5 py-3.5 bg-gray-50 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold" /></div></div><div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-gray-50"><div className="md:col-span-2"><h4 className="text-xs font-black text-red-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-2"><Lock size={14} /> Keamanan Login</h4></div><div className="space-y-2"><label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Username</label><div className="relative"><Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} /><input required value={adminProfile.username} onChange={e => setAdminProfile({...adminProfile, username: e.target.value})} className="w-full pl-12 pr-5 py-3.5 bg-gray-50 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold text-indigo-700" /></div></div><div className="space-y-2"><label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Password</label><div className="relative"><Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} /><input type={showPassword ? "text" : "password"} value={adminProfile.password} onChange={e => setAdminProfile({...adminProfile, password: e.target.value})} className="w-full pl-12 pr-12 py-3.5 bg-gray-50 rounded-2xl focus:ring-4 focus:ring-red-100 outline-none font-bold text-gray-800" /><button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 transition-colors hover:text-indigo-600">{showPassword ? <EyeOff size={20} /> : <Eye size={20} />}</button></div></div></div><button type="submit" className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-lg shadow-xl hover:bg-indigo-700 transition-all active:scale-[0.98] mt-4 shadow-indigo-100 uppercase tracking-widest">SIMPAN PROFIL</button></form></div></div></div>
-  );
-}
-
-function AppSettingsSection({ appSettings, setAppSettings, showNotification }) {
-  const handleSave = (e) => { e.preventDefault(); showNotification("Pengaturan database berhasil disimpan!"); };
-  return (
-    <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-2">
-      <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 sm:p-12">
-        <div className="flex items-center gap-3 mb-10 border-b border-gray-50 pb-6 text-left"><div className="bg-indigo-600 p-3 rounded-2xl text-white shadow-lg rotate-3"><Database size={28} /></div><div><h2 className="text-2xl font-black text-gray-900 leading-tight uppercase">Pengaturan Sistem</h2><p className="text-gray-400 text-sm font-medium italic uppercase tracking-widest">Konfigurasi Sumber Database Utama</p></div></div>
-        <form onSubmit={handleSave} className="space-y-8 text-left">
-          <div className="grid grid-cols-1 gap-8">
-            <div className="space-y-4"><h4 className="text-xs font-black text-indigo-400 uppercase tracking-[0.2em] flex items-center gap-2"><Globe size={14} /> Link Spreadsheet / Google Drive</h4><p className="text-xs text-gray-400 font-medium italic">Masukkan URL Spreadsheet master (Pastikan akses disetel ke "Siapa saja dengan link").</p></div>
-            <div className="space-y-6">
-              <div className="space-y-2"><label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Database Kendaraan Dinas</label><input type="url" value={appSettings.linkDbKendaraan} onChange={e => setAppSettings({...appSettings, linkDbKendaraan: e.target.value})} className="w-full px-5 py-4 bg-gray-50 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold text-gray-600 shadow-inner" placeholder="https://docs.google.com/spreadsheets/d/..." /></div>
-              <div className="space-y-2"><label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Database Peralatan Elektronik</label><input type="url" value={appSettings.linkDbElektronik} onChange={e => setAppSettings({...appSettings, linkDbElektronik: e.target.value})} className="w-full px-5 py-4 bg-gray-50 rounded-2xl focus:ring-4 focus:ring-emerald-100 outline-none font-bold text-gray-600 shadow-inner" placeholder="https://docs.google.com/spreadsheets/d/..." /></div>
-              <div className="space-y-2"><label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Database Barang Lainnya</label><input type="url" value={appSettings.linkDbBarangLain} onChange={e => setAppSettings({...appSettings, linkDbBarangLain: e.target.value})} className="w-full px-5 py-4 bg-gray-50 rounded-2xl focus:ring-4 focus:ring-amber-100 outline-none font-bold text-gray-600 shadow-inner" placeholder="https://docs.google.com/spreadsheets/d/..." /></div>
-              <div className="space-y-2 pt-4 border-t border-gray-50"><label className="text-xs font-black text-emerald-600 uppercase tracking-widest ml-1">Database Akun Pengguna (Sinkronisasi Excel)</label><input type="url" value={appSettings.linkDbUsers} onChange={e => setAppSettings({...appSettings, linkDbUsers: e.target.value})} className="w-full px-5 py-4 bg-emerald-50/50 border border-emerald-100 rounded-2xl outline-none font-bold text-gray-600 shadow-inner" placeholder="https://docs.google.com/spreadsheets/d/..." /></div>
-            </div>
-          </div>
-          <div className="pt-6"><button type="submit" className="w-full bg-gray-900 text-white py-5 rounded-[2rem] font-black text-lg shadow-xl hover:bg-black transition-all active:scale-[0.98] uppercase tracking-widest flex items-center justify-center gap-3"><Save size={24} /> Simpan Semua Konfigurasi</button></div>
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in">
+      <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+        <div className="p-8 border-b border-gray-100 flex items-center justify-between bg-white z-10 text-left"><div className="flex items-center gap-3"><UserPlus className="text-indigo-600" /><h3 className="text-2xl font-black text-gray-900 uppercase tracking-tight">Tambah Pengguna Baru</h3></div><button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-xl"><X /></button></div>
+        <form onSubmit={onSubmit} className="p-8 space-y-4 text-left">
+          <div><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nama Lengkap</label><input required value={formData.nama} onChange={e => setFormData({...formData, nama: e.target.value.toUpperCase()})} className="w-full px-5 py-3.5 bg-gray-50 border-none rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold uppercase" /></div>
+          <div className="grid grid-cols-2 gap-4"><div><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">NIP</label><input required value={formData.nip} onChange={e => setFormData({...formData, nip: e.target.value})} className="w-full px-5 py-3.5 bg-gray-50 border-none rounded-2xl outline-none font-bold" /></div><div><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Username</label><input required value={formData.username} onChange={e => setFormData({...formData, username: e.target.value.toLowerCase().replace(/\s/g, '')})} className="w-full px-5 py-3.5 bg-gray-50 border-none rounded-2xl outline-none font-bold" /></div></div>
+          <div><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Email</label><input type="email" required value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full px-5 py-3.5 bg-gray-50 border-none rounded-2xl outline-none font-bold" /></div>
+          <div className="flex gap-4 pt-6"><button type="button" onClick={onClose} className="flex-1 py-4 bg-gray-100 rounded-2xl font-bold">Batal</button><button type="submit" className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-bold">Tambah</button></div>
         </form>
       </div>
     </div>
@@ -698,32 +656,154 @@ function AppSettingsSection({ appSettings, setAppSettings, showNotification }) {
 }
 
 function AssetModal({ activeAssetTab, editingItem, formData, setFormData, closeModal, handleAddOrEdit }) {
+  const isVehicle = activeAssetTab === 'Kendaraan Dinas';
+  const isElectronic = activeAssetTab === 'Peralatan Elektronik';
+  const isOther = activeAssetTab === 'Barang Lain';
+
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in"><div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 max-h-[90vh] overflow-y-auto"><div className="p-8 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10 text-left"><div className="flex items-center gap-3"><div className={`p-2 rounded-xl text-white ${activeAssetTab === 'Kendaraan Dinas' ? 'bg-indigo-600' : activeAssetTab === 'Peralatan Elektronik' ? 'bg-emerald-600' : 'bg-amber-600'}`}>{activeAssetTab === 'Kendaraan Dinas' ? <Car size={24} /> : activeAssetTab === 'Peralatan Elektronik' ? <Laptop size={24} /> : <Package size={24} />}</div><h3 className="text-2xl font-black text-gray-900 uppercase tracking-tight">{editingItem ? 'Edit' : 'Tambah'} {activeAssetTab}</h3></div><button onClick={closeModal} className="p-2 hover:bg-gray-100 rounded-xl transition-colors text-gray-400"><X /></button></div>
-      <form onSubmit={handleAddOrEdit} className="p-8 space-y-6 text-left">
-        {(activeAssetTab === 'Peralatan Elektronik' || activeAssetTab === 'Barang Lain') && (<div className="space-y-2 text-left"><label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">NUP</label><input required value={formData.nup} onChange={e => setFormData({...formData, nup: e.target.value})} className="w-full px-5 py-4 bg-gray-50 rounded-2xl outline-none font-bold" placeholder="LNN-2024-001" /></div>)}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left"><div className="space-y-2"><label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Nama Fasilitas</label>{activeAssetTab === 'Peralatan Elektronik' ? (<select value={formData.nama} onChange={e => setFormData({...formData, nama: e.target.value})} className="w-full px-4 py-4 bg-gray-50 rounded-2xl outline-none font-bold">{ELEKTRONIK_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}</select>) : (<input required value={formData.nama} onChange={e => setFormData({...formData, nama: e.target.value})} className="w-full px-5 py-4 bg-gray-50 rounded-2xl outline-none font-bold" />)}</div><div className="space-y-2"><label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Status</label><select value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})} className="w-full px-4 py-4 bg-gray-50 rounded-2xl outline-none font-bold"><option value="Tersedia">Tersedia</option><option value="Dipinjam">Dipinjam</option><option value="Rusak">Rusak</option></select></div></div>
-        <div className="flex gap-4 pt-6"><button type="button" onClick={closeModal} className="flex-1 py-4 rounded-2xl font-bold bg-gray-100">Batal</button><button type="submit" className="flex-1 bg-indigo-600 text-white py-4 rounded-2xl font-black">Simpan</button></div>
-      </form></div></div>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in">
+      <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+        <div className="p-8 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10 text-left">
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-xl text-white ${isVehicle ? 'bg-indigo-600' : isElectronic ? 'bg-emerald-600' : 'bg-amber-600'}`}>
+              {isVehicle ? <Car size={24} /> : isElectronic ? <Laptop size={24} /> : <Package size={24} />}
+            </div>
+            <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tight">{editingItem ? 'Edit' : 'Tambah'} {activeAssetTab}</h3>
+          </div>
+          <button onClick={closeModal} className="p-2 hover:bg-gray-100 rounded-xl transition-colors text-gray-400"><X /></button>
+        </div>
+        <form onSubmit={handleAddOrEdit} className="p-8 space-y-6 text-left">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {!isVehicle && (
+              <div className="space-y-2"><label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Kode NUP</label><input required value={formData.nup || ''} onChange={e => setFormData({...formData, nup: e.target.value})} className="w-full px-5 py-4 bg-gray-50 rounded-2xl outline-none font-bold" placeholder="LNN-XXXX" /></div>
+            )}
+            <div className="space-y-2">
+              <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Nama {isVehicle ? 'Kendaraan' : isElectronic ? 'Alat' : 'Barang'}</label>
+              {isElectronic ? (
+                <select value={formData.nama} onChange={e => setFormData({...formData, nama: e.target.value})} className="w-full px-4 py-4 bg-gray-50 rounded-2xl outline-none font-bold">
+                  {ELEKTRONIK_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                </select>
+              ) : (
+                <input required value={formData.nama} onChange={e => setFormData({...formData, nama: e.target.value})} className="w-full px-5 py-4 bg-gray-50 rounded-2xl outline-none font-bold" placeholder="Contoh: Toyota Avanza" />
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2"><label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Status</label><select value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})} className="w-full px-4 py-4 bg-gray-50 rounded-2xl outline-none font-bold"><option value="Tersedia">Tersedia</option><option value="Dipinjam">Dipinjam</option><option value="Rusak">Rusak</option></select></div>
+            {formData.status === 'Rusak' && (
+              <div className="space-y-2 animate-in slide-in-from-top-2"><label className="text-xs font-black text-red-500 uppercase tracking-widest ml-1">Deskripsi Kerusakan</label><textarea required value={formData.deskripsiRusak || ''} onChange={e => setFormData({...formData, deskripsiRusak: e.target.value})} className="w-full px-5 py-3 bg-red-50 rounded-2xl outline-none font-bold border border-red-100 h-24" placeholder="Sebutkan detail kerusakan..." /></div>
+            )}
+          </div>
+
+          {isVehicle && (
+            <div className="space-y-6 pt-4 border-t border-dashed">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2"><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Nomor Plat</label><input required value={formData.noPlat || ''} onChange={e => setFormData({...formData, noPlat: e.target.value})} className="w-full px-4 py-3 bg-gray-50 rounded-xl outline-none font-bold font-mono" /></div>
+                <div className="space-y-2"><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">No. Rangka</label><input value={formData.noRangka || ''} onChange={e => setFormData({...formData, noRangka: e.target.value})} className="w-full px-4 py-3 bg-gray-50 rounded-xl outline-none font-bold text-xs" /></div>
+                <div className="space-y-2"><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">No. Mesin</label><input value={formData.noMesin || ''} onChange={e => setFormData({...formData, noMesin: e.target.value})} className="w-full px-4 py-3 bg-gray-50 rounded-xl outline-none font-bold text-xs" /></div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2"><label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Kilometer (Odometer)</label><div className="relative"><Gauge className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} /><input value={formData.kilometer || ''} onChange={e => setFormData({...formData, kilometer: e.target.value})} className="w-full pl-12 pr-4 py-3 bg-indigo-50/30 rounded-xl outline-none font-bold" placeholder="Contoh: 15400" /></div></div>
+                <div className="space-y-2"><label className="text-[10px] font-black text-amber-600 uppercase tracking-widest">Tgl Pajak Selanjutnya</label><input type="date" value={formData.tglPajak || ''} onChange={e => setFormData({...formData, tglPajak: e.target.value})} className="w-full px-4 py-3 bg-amber-50/30 rounded-xl outline-none font-bold" /></div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-4 bg-slate-50 rounded-2xl space-y-3">
+                  <span className="text-[10px] font-black text-slate-400 uppercase block border-b pb-1">Pemeliharaan Oli Mesin</span>
+                  <div className="flex gap-2">
+                    <div className="flex-1"><label className="text-[8px] font-bold text-gray-400 uppercase">Terakhir</label><input type="date" value={formData.tglOliMesin || ''} onChange={e => setFormData({...formData, tglOliMesin: e.target.value})} className="w-full text-xs p-2 rounded-lg border-none bg-white font-bold" /></div>
+                    <div className="flex-1"><label className="text-[8px] font-bold text-indigo-500 uppercase">Selanjutnya</label><input type="date" value={formData.tglOliMesinNext || ''} onChange={e => setFormData({...formData, tglOliMesinNext: e.target.value})} className="w-full text-xs p-2 rounded-lg border-none bg-white font-bold" /></div>
+                  </div>
+                </div>
+                <div className="p-4 bg-slate-50 rounded-2xl space-y-3">
+                  <span className="text-[10px] font-black text-slate-400 uppercase block border-b pb-1">Pemeliharaan Oli Perseneling</span>
+                  <div className="flex gap-2">
+                    <div className="flex-1"><label className="text-[8px] font-bold text-gray-400 uppercase">Terakhir</label><input type="date" value={formData.tglOliPerseneling || ''} onChange={e => setFormData({...formData, tglOliPerseneling: e.target.value})} className="w-full text-xs p-2 rounded-lg border-none bg-white font-bold" /></div>
+                    <div className="flex-1"><label className="text-[8px] font-bold text-emerald-500 uppercase">Selanjutnya</label><input type="date" value={formData.tglOliPersenelingNext || ''} onChange={e => setFormData({...formData, tglOliPersenelingNext: e.target.value})} className="w-full text-xs p-2 rounded-lg border-none bg-white font-bold" /></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {!isVehicle && (
+            <div className="grid grid-cols-1 gap-6 pt-4 border-t border-dashed">
+              <div className="space-y-2"><label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Merek</label><input required value={formData.merek || ''} onChange={e => setFormData({...formData, merek: e.target.value})} className="w-full px-5 py-3 bg-gray-50 rounded-2xl outline-none font-bold" placeholder="Contoh: Epson / MacBook" /></div>
+              <div className="space-y-2"><label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Spesifikasi Detail</label><textarea value={formData.spek || ''} onChange={e => setFormData({...formData, spek: e.target.value})} className="w-full px-5 py-4 bg-gray-50 rounded-2xl outline-none font-bold h-32" placeholder="Masukkan spesifikasi lengkap..." /></div>
+            </div>
+          )}
+
+          <div className="flex gap-4 pt-6"><button type="button" onClick={closeModal} className="flex-1 py-4 rounded-2xl font-bold bg-gray-100 uppercase tracking-widest text-xs">Batal</button><button type="submit" className="flex-1 bg-indigo-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-xs">Simpan Data</button></div>
+        </form>
+      </div>
+    </div>
   );
 }
 
 function AssetDetailModal({ selectedDetailItem, closeDetailModal }) {
   if (!selectedDetailItem) return null;
   const isVehicle = selectedDetailItem.kategori === 'Kendaraan Dinas';
-  const themeColor = isVehicle ? 'bg-indigo-600' : selectedDetailItem.kategori === 'Peralatan Elektronik' ? 'bg-emerald-600' : 'bg-amber-600';
+  const isElectronic = selectedDetailItem.kategori === 'Peralatan Elektronik';
+  const themeColor = isVehicle ? 'bg-indigo-600' : isElectronic ? 'bg-emerald-600' : 'bg-amber-600';
+
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in">
       <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
         <div className={`p-8 border-b border-gray-100 flex items-center justify-between ${themeColor} text-white`}>
-          <div className="flex items-center gap-3 text-left"><div className="bg-white/20 p-2 rounded-xl">{isVehicle ? <Car size={24} /> : <Package size={24} />}</div><div><h3 className="text-xl font-black uppercase tracking-tight leading-none mb-1">Rincian Unit</h3><p className="text-white/80 text-[10px] uppercase">Informasi Aset</p></div></div>
-          <button onClick={closeDetailModal} className="p-2 hover:bg-white/10 rounded-xl"><X /></button>
+          <div className="flex items-center gap-3 text-left">
+            <div className="bg-white/20 p-2 rounded-xl">{isVehicle ? <Car size={24} /> : isElectronic ? <Laptop size={24} /> : <Package size={24} />}</div>
+            <div><h3 className="text-xl font-black uppercase tracking-tight leading-none mb-1">Rincian Unit</h3><p className="text-white/80 text-[10px] uppercase">Informasi Detail Aset</p></div>
+          </div>
+          <button onClick={closeDetailModal} className="p-2 hover:bg-white/10 rounded-xl transition-colors"><X /></button>
         </div>
         <div className="p-8 overflow-y-auto space-y-8 text-left">
-          <div className="p-6 bg-slate-50 rounded-3xl border border-gray-100 text-left"><h2 className="text-3xl font-black text-slate-900 uppercase leading-tight">{selectedDetailItem.nama}</h2><div className="flex items-center gap-2 mt-2"><div className={`${themeColor} text-white px-4 py-1 rounded-lg font-mono font-bold`}>{selectedDetailItem.noPlat || selectedDetailItem.nup}</div><span className={`px-4 py-1.5 rounded-lg text-xs font-black uppercase bg-white border border-gray-200`}>{selectedDetailItem.status}</span></div></div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm font-medium text-left"><div className="space-y-4"><h4 className="font-black text-gray-400 uppercase tracking-widest flex items-center gap-2 border-b pb-2"><ClipboardList size={16} /> Identitas Fisik</h4><div className="flex justify-between"><span>Kategori</span><span className="font-bold">{selectedDetailItem.kategori}</span></div></div><div className="space-y-4"><h4 className="font-black text-gray-400 uppercase tracking-widest flex items-center gap-2 border-b pb-2"><Wrench size={16} /> Spesifikasi</h4><div className="p-4 bg-slate-50 rounded-xl italic">{selectedDetailItem.spek || 'Tidak ada info tambahan.'}</div></div></div>
+          <div className="p-6 bg-slate-50 rounded-3xl border border-gray-100">
+            <h2 className="text-3xl font-black text-slate-900 uppercase leading-tight">{selectedDetailItem.nama}</h2>
+            <div className="flex items-center gap-2 mt-2">
+              <div className={`${themeColor} text-white px-4 py-1 rounded-lg font-mono font-bold`}>{selectedDetailItem.noPlat || selectedDetailItem.nup || '-'}</div>
+              <span className={`px-4 py-1.5 rounded-lg text-xs font-black uppercase bg-white border border-gray-200`}>{selectedDetailItem.status}</span>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-left">
+            <div className="space-y-4">
+              <h4 className="font-black text-gray-400 uppercase tracking-widest flex items-center gap-2 border-b pb-2"><ClipboardList size={16} /> Identitas Fisik</h4>
+              <div className="space-y-2">
+                {isVehicle ? (
+                  <>
+                    <div className="flex justify-between"><span>No. Rangka:</span><span className="font-bold font-mono text-[10px]">{selectedDetailItem.noRangka || '-'}</span></div>
+                    <div className="flex justify-between"><span>No. Mesin:</span><span className="font-bold font-mono text-[10px]">{selectedDetailItem.noMesin || '-'}</span></div>
+                    <div className="flex justify-between"><span>Kilometer:</span><span className="font-bold text-indigo-600">{selectedDetailItem.kilometer || '0'} KM</span></div>
+                    <div className="flex justify-between"><span>Tgl Pajak:</span><span className="font-bold text-amber-600">{selectedDetailItem.tglPajak || '-'}</span></div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex justify-between"><span>Kode NUP:</span><span className="font-bold">{selectedDetailItem.nup || '-'}</span></div>
+                    <div className="flex justify-between"><span>Merek:</span><span className="font-bold uppercase">{selectedDetailItem.merek || '-'}</span></div>
+                  </>
+                )}
+                <div className="flex justify-between"><span>Kategori:</span><span className="font-bold uppercase text-[10px]">{selectedDetailItem.kategori}</span></div>
+              </div>
+            </div>
+            <div className="space-y-4 text-left">
+              <h4 className="font-black text-gray-400 uppercase tracking-widest flex items-center gap-2 border-b pb-2"><Wrench size={16} /> {isVehicle ? 'Pemeliharaan' : 'Spesifikasi'}</h4>
+              {isVehicle ? (
+                <div className="space-y-3 text-[10px]">
+                   <div className="bg-slate-50 p-2 rounded-lg"><p className="text-gray-400 font-black uppercase">Oli Mesin</p><p className="font-bold">Last: {selectedDetailItem.tglOliMesin || '-'} | Next: {selectedDetailItem.tglOliMesinNext || '-'}</p></div>
+                   <div className="bg-slate-50 p-2 rounded-lg"><p className="text-gray-400 font-black uppercase">Oli Perseneling</p><p className="font-bold">Last: {selectedDetailItem.tglOliPerseneling || '-'} | Next: {selectedDetailItem.tglOliPersenelingNext || '-'}</p></div>
+                </div>
+              ) : (
+                <div className="p-3 bg-slate-50 rounded-xl italic text-xs leading-relaxed">{selectedDetailItem.spek || 'Tidak ada spesifikasi tambahan.'}</div>
+              )}
+            </div>
+          </div>
+          {selectedDetailItem.status === 'Rusak' && (
+            <div className="bg-red-50 p-5 rounded-3xl border border-red-100 animate-in fade-in">
+               <h4 className="text-sm font-black text-red-700 uppercase tracking-widest mb-2 flex items-center gap-2"><AlertCircle size={18} /> Detail Kerusakan</h4>
+               <p className="text-red-900 font-medium italic text-xs leading-relaxed">"{selectedDetailItem.deskripsiRusak || 'Keterangan belum diisi.'}"</p>
+            </div>
+          )}
         </div>
-        <div className="p-8 border-t border-gray-100 bg-gray-50 flex justify-end"><button onClick={closeDetailModal} className={`${themeColor} text-white px-10 py-4 rounded-[1.8rem] font-black uppercase text-xs shadow-lg`}>Tutup</button></div>
+        <div className="p-8 border-t border-gray-100 bg-gray-50 flex justify-end"><button onClick={closeDetailModal} className={`${themeColor} text-white px-10 py-4 rounded-[1.8rem] font-black uppercase text-xs shadow-lg transition-all active:scale-95`}>Tutup Rincian</button></div>
       </div>
     </div>
   );

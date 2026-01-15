@@ -25,7 +25,6 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'sikopifasta-v4';
 
-// Menambahkan data contoh untuk keperluan visualisasi
 const INITIAL_DATA = [
   {
     id: 'dummy-v-1',
@@ -43,7 +42,7 @@ const INITIAL_DATA = [
   },
   {
     id: 'dummy-e-1',
-    nama: 'Laptop/PC',
+    nama: 'LAPTOP PEGAWAI',
     merek: 'MacBook Pro M2',
     nup: 'LNN-2024-001',
     kategori: 'Peralatan Elektronik',
@@ -56,8 +55,8 @@ const INITIAL_DATA = [
   },
   {
     id: 'dummy-b-1',
-    nama: 'Proyektor Epson EB-X05',
-    merek: 'Epson',
+    nama: 'PROYEKTOR RUANG RAPAT',
+    merek: 'Epson EB-X05',
     nup: 'BL-2024-005',
     kategori: 'Barang Lain',
     status: 'Tersedia',
@@ -65,7 +64,6 @@ const INITIAL_DATA = [
   }
 ];
 
-// Mempertahankan 1 Akun Master Admin + 1 Contoh User
 const INITIAL_USERS = [
   {
     id: 'admin-master', 
@@ -127,7 +125,6 @@ export default function App() {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [notification, setNotification] = useState(null);
 
-  // Auth Lifecycle
   useEffect(() => {
     const initAuth = async () => {
       if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
@@ -141,7 +138,6 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Firestore Real-time Sync for Users
   useEffect(() => {
     if (!firebaseUser) return;
     const usersCol = collection(db, 'artifacts', appId, 'public', 'data', 'users');
@@ -152,7 +148,6 @@ export default function App() {
     return () => unsubscribe();
   }, [firebaseUser]);
 
-  // Muat pustaka XLSX
   useEffect(() => {
     const script = document.createElement('script');
     script.src = "https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js";
@@ -164,7 +159,6 @@ export default function App() {
     };
   }, []);
 
-  // Logika Sinkronisasi Data Otomatis dari Spreadsheet
   useEffect(() => {
     const fetchDataFromSheet = async (url, categoryLabel, prefix) => {
       if (!url || url.trim() === '' || typeof window.XLSX === 'undefined') return;
@@ -177,39 +171,19 @@ export default function App() {
           if (!response.ok) throw new Error("Gagal akses spreadsheet");
           const arrayBuffer = await response.arrayBuffer();
           const workbook = window.XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
-          const firstSheetName = workbook.SheetNames[0];
-          const worksheet = workbook.Sheets[firstSheetName];
+          const worksheet = workbook.Sheets[workbook.SheetNames[0]];
           const jsonData = window.XLSX.utils.sheet_to_json(worksheet);
           if (categoryLabel === 'Users') {
             for (const item of jsonData) {
               const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', item.username || `user-${Date.now()}`);
-              await setDoc(userRef, {
-                ...item,
-                nama: (item.nama || '').toUpperCase(),
-                role: item.role || 'user',
-                historyTerlambat: item.historyTerlambat || 0,
-                historyRusak: item.historyRusak || 0,
-                password: item.password || 'password123'
-              }, { merge: true });
+              await setDoc(userRef, { ...item, nama: (item.nama || '').toUpperCase(), role: item.role || 'user', password: item.password || 'password123' }, { merge: true });
             }
-            showNotification(`Database Pengguna Berhasil Diimpor!`);
           } else {
-            const mappedData = jsonData.map((item, index) => ({
-              ...item,
-              id: item.id || `fetched-${prefix}-${index}`,
-              kategori: categoryLabel,
-              status: item.status || 'Tersedia'
-            }));
-            setData(prev => [
-              ...prev.filter(i => i.kategori !== categoryLabel),
-              ...mappedData
-            ]);
-            showNotification(`Database ${categoryLabel} Berhasil Disinkronkan!`);
+            const mappedData = jsonData.map((item, index) => ({ ...item, id: item.id || `fetched-${prefix}-${index}`, kategori: categoryLabel, status: item.status || 'Tersedia' }));
+            setData(prev => [ ...prev.filter(i => i.kategori !== categoryLabel), ...mappedData ]);
           }
         }
-      } catch (error) {
-        showNotification(`Gagal memuat database ${categoryLabel}. Periksa link & akses.`);
-      }
+      } catch (error) { console.error(error); }
     };
     const timer = setTimeout(() => {
       fetchDataFromSheet(appSettings.linkDbKendaraan, 'Kendaraan Dinas', 'v');
@@ -218,7 +192,7 @@ export default function App() {
       fetchDataFromSheet(appSettings.linkDbUsers, 'Users', 'u');
     }, 1500);
     return () => clearTimeout(timer);
-  }, [appSettings.linkDbKendaraan, appSettings.linkDbElektronik, appSettings.linkDbBarangLain, appSettings.linkDbUsers]);
+  }, [appSettings]);
 
   const showNotification = (msg) => {
     setNotification(msg);
@@ -232,10 +206,7 @@ export default function App() {
   };
 
   const exportToExcel = (category = null) => {
-    if (typeof window.XLSX === 'undefined') {
-      showNotification("Pustaka Excel sedang dimuat...");
-      return;
-    }
+    if (typeof window.XLSX === 'undefined') return;
     try {
       const dataToExport = category ? data.filter(item => item.kategori === category) : data;
       const ws = window.XLSX.utils.json_to_sheet(dataToExport);
@@ -244,29 +215,20 @@ export default function App() {
       const dateStr = new Date().toLocaleDateString('id-ID').replace(/\//g, '-');
       const filename = category ? `${category.replace(/\s+/g, '_')}_${dateStr}.xlsx` : `Database_Full_SIKOPIFASTA_${dateStr}.xlsx`;
       window.XLSX.writeFile(wb, filename);
-      showNotification(`Berhasil mengunduh data ${category || 'Lengkap'}!`);
-    } catch (err) {
-      showNotification("Gagal mengekspor data.");
-    }
+    } catch (err) { showNotification("Gagal mengekspor data."); }
   };
 
   const handleExportUsers = () => {
-    if (typeof window.XLSX === 'undefined') {
-      showNotification("Pustaka Excel sedang dimuat...");
-      return;
-    }
+    if (typeof window.XLSX === 'undefined') return;
     try {
       const ws = window.XLSX.utils.json_to_sheet(users);
       const wb = window.XLSX.utils.book_new();
       window.XLSX.utils.book_append_sheet(wb, ws, "Database Pengguna");
       const date = new Date();
       const dateStr = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
-      const filename = `Database-Pengguna-${dateStr}.xlsx`;
-      window.XLSX.writeFile(wb, filename);
+      window.XLSX.writeFile(wb, `Database-Pengguna-${dateStr}.xlsx`);
       showNotification(`Berhasil membackup database pengguna!`);
-    } catch (err) {
-      showNotification("Gagal backup data pengguna.");
-    }
+    } catch (err) { showNotification("Gagal backup data pengguna."); }
   };
 
   const handleImportUsersExcel = (e) => {
@@ -282,20 +244,11 @@ export default function App() {
         for (const item of importedData) {
           if (item.username === 'admin') continue;
           const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', item.username);
-          await setDoc(userRef, {
-            ...item,
-            nama: (item.nama || '').toUpperCase(),
-            role: item.role || 'user',
-            historyTerlambat: Number(item.historyTerlambat) || 0,
-            historyRusak: Number(item.historyRusak) || 0,
-            password: item.password || 'password123'
-          }, { merge: true });
+          await setDoc(userRef, { ...item, nama: (item.nama || '').toUpperCase(), role: item.role || 'user', password: item.password || 'password123' }, { merge: true });
         }
         showNotification(`Restore data pengguna selesai!`);
         e.target.value = null;
-      } catch (err) {
-        showNotification("Gagal memproses file restore pengguna.");
-      }
+      } catch (err) { showNotification("Gagal memproses file restore pengguna."); }
     };
     reader.readAsBinaryString(file);
   };
@@ -345,16 +298,36 @@ export default function App() {
 }
 
 // ==========================================
-// 3. KOMPONEN GLOBAL
+// 3. SUB-KOMPONEN REUSABLE
 // ==========================================
+function StatusInfographic({ stats, currentFilter, onFilterChange }) {
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      <StatCard label="Total Unit" count={stats.total} icon={<Boxes size={20} />} color="bg-slate-600" isActive={currentFilter === 'Semua'} onClick={() => onFilterChange('Semua')} />
+      <StatCard label="Tersedia" count={stats.available} icon={<CheckCircle2 size={20} />} color="bg-emerald-500" isActive={currentFilter === 'Tersedia'} onClick={() => onFilterChange('Tersedia')} />
+      <StatCard label="Dipinjam" count={stats.borrowed} icon={<Clock size={20} />} color="bg-orange-500" isActive={currentFilter === 'Dipinjam'} onClick={() => onFilterChange('Dipinjam')} />
+      <StatCard label="Rusak" count={stats.damaged} icon={<AlertCircle size={20} />} color="bg-red-500" isActive={currentFilter === 'Rusak'} onClick={() => onFilterChange('Rusak')} />
+    </div>
+  );
+}
+
+function StatCard({ label, count, icon, color, isActive, onClick }) {
+  return (
+    <div onClick={onClick} className={`cursor-pointer p-5 rounded-3xl border-2 transition-all transform active:scale-95 ${isActive ? `border-white ${color} text-white shadow-lg` : 'border-gray-100 bg-white hover:border-gray-200 shadow-sm'}`}>
+      <div className="flex items-center justify-between mb-2">
+        <div className={`p-2 rounded-xl ${isActive ? 'bg-white/20' : 'bg-slate-50 text-slate-400'}`}>{icon}</div>
+        <span className={`text-2xl font-black ${isActive ? 'text-white' : 'text-slate-900'}`}>{count}</span>
+      </div>
+      <p className={`text-[10px] font-black uppercase tracking-widest ${isActive ? 'text-white/80' : 'text-slate-400'}`}>{label}</p>
+    </div>
+  );
+}
+
 function Header({ view, setView, currentUser, onLogout, setSelectedCategory }) {
   return (
     <nav className="bg-white border-b border-gray-100 shadow-sm sticky top-0 z-50">
       <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-        <div 
-          className="flex items-center gap-2 cursor-pointer text-indigo-700 transition-transform active:scale-95"
-          onClick={() => { setView('user_dashboard'); setSelectedCategory(null); }}
-        >
+        <div className="flex items-center gap-2 cursor-pointer text-indigo-700 transition-transform active:scale-95" onClick={() => { setView('user_dashboard'); setSelectedCategory(null); }}>
           <div className="bg-indigo-100 p-2 rounded-lg"><Home size={22} /></div>
           <span className="font-extrabold text-xl tracking-tight uppercase">SIKOPIFASTA</span>
         </div>
@@ -427,78 +400,43 @@ function UserDashboard({ setView, setSelectedCategory, exportToExcel }) {
 function CategoryDetail({ selectedCategory, setView, data, appSettings, currentUser, showNotification }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('Semua');
-  
-  const filteredItems = data.filter(item => 
-    item.kategori === selectedCategory && 
+  const categoryData = data.filter(item => item.kategori === selectedCategory);
+  const stats = {
+    total: categoryData.length,
+    available: categoryData.filter(i => i.status === 'Tersedia').length,
+    borrowed: categoryData.filter(i => i.status === 'Dipinjam').length,
+    damaged: categoryData.filter(i => i.status === 'Rusak').length
+  };
+  const filteredItems = categoryData.filter(item => 
     item.nama.toLowerCase().includes(searchTerm.toLowerCase()) &&
     (statusFilter === 'Semua' ? true : item.status === statusFilter)
   );
-
-  const isDbMissing = (selectedCategory === 'Kendaraan Dinas' && (!appSettings.linkDbKendaraan || appSettings.linkDbKendaraan.trim() === '')) ||
-                     (selectedCategory === 'Peralatan Elektronik' && (!appSettings.linkDbElektronik || appSettings.linkDbElektronik.trim() === '')) ||
-                     (selectedCategory === 'Barang Lain' && (!appSettings.linkDbBarangLain || appSettings.linkDbBarangLain.trim() === ''));
-
   return (
-    <div className="p-4 sm:p-8 max-w-6xl mx-auto animate-in slide-in-from-bottom-4 duration-500">
+    <div className="p-4 sm:p-8 max-w-6xl mx-auto animate-in slide-in-from-bottom-4 duration-500 text-left">
       <div className="flex items-center gap-4 mb-8">
         <button onClick={() => setView('user_dashboard')} className="p-3 bg-white hover:bg-gray-50 rounded-2xl border border-gray-100 shadow-sm transition-all active:scale-90 text-gray-600"><ArrowLeft size={24} /></button>
         <div><h2 className="text-2xl font-black text-gray-900 mb-1 leading-none uppercase tracking-tight">{selectedCategory}</h2><p className="text-gray-500 text-sm font-medium">Temukan fasilitas yang Anda butuhkan.</p></div>
       </div>
-
-      {isDbMissing && data.filter(i => i.kategori === selectedCategory).length === 0 ? (
-        <div className="bg-white p-12 rounded-[3rem] border border-dashed border-gray-200 text-center animate-in fade-in">
-           <Database size={60} className="mx-auto text-gray-200 mb-4" />
-           <h3 className="text-xl font-black text-gray-400 uppercase tracking-tight">Database Belum Terhubung</h3>
-           <p className="text-gray-400 text-sm mt-2 font-medium italic">Hubungi administrator untuk menautkan link spreadsheet database {selectedCategory}.</p>
+      <StatusInfographic stats={stats} currentFilter={statusFilter} onFilterChange={setStatusFilter} />
+      <div className="flex flex-col md:flex-row gap-4 mb-8">
+        <div className="relative flex-grow"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={22} /><input type="text" placeholder={`Cari di ${selectedCategory}...`} className="w-full pl-12 pr-6 py-4 rounded-3xl border border-gray-200 focus:outline-none focus:ring-4 focus:ring-indigo-100 shadow-sm text-lg transition-all font-bold" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
+        <div className="relative min-w-[200px]"><Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} /><select className="w-full pl-12 pr-6 py-4 rounded-3xl border border-gray-200 focus:outline-none focus:ring-4 focus:ring-indigo-100 shadow-sm text-lg transition-all font-bold appearance-none bg-white cursor-pointer" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}><option value="Semua">Semua Status</option><option value="Tersedia">Tersedia</option><option value="Dipinjam">Dipinjam</option><option value="Rusak">Rusak</option></select></div>
+      </div>
+      {filteredItems.length === 0 ? <div className="p-12 text-center text-gray-400 font-bold italic">Tidak ada data ditemukan.</div> : (
+        <div className="grid grid-cols-1 gap-4">
+          {filteredItems.map(item => (
+            <div key={item.id} className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-6 group hover:border-indigo-200 transition-all">
+              <div className="flex gap-5">
+                <div className="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">{item.kategori === 'Kendaraan Dinas' ? <Car size={28}/> : item.kategori === 'Peralatan Elektronik' ? <Laptop size={28}/> : <Package size={28}/>}</div>
+                <div><h4 className="font-bold text-gray-900 text-lg group-hover:text-indigo-700 transition-colors leading-tight uppercase">{item.nama}</h4><p className="text-sm text-gray-500 font-medium mt-1">{item.kategori === 'Kendaraan Dinas' ? item.noPlat : (item.kategori === 'Peralatan Elektronik' || item.kategori === 'Barang Lain' ? `${item.merek || ''} - ${item.nup || ''}` : item.spek)}</p></div>
+              </div>
+              <div className="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-t-0 pt-4 sm:pt-0">
+                 <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${item.status === 'Tersedia' ? 'bg-green-50 text-green-700 border-green-100' : item.status === 'Dipinjam' ? 'bg-orange-50 text-orange-700 border-orange-100' : 'bg-red-50 text-red-700 border-red-100'}`}>{item.status}</span>
+                 <button onClick={() => { if (currentUser) { showNotification(`Peminjaman ${item.nama} sedang diproses untuk ${currentUser.nama}.`); } else { setView('login_portal'); } }} className="bg-indigo-600 text-white px-10 py-3 rounded-2xl text-sm font-black uppercase tracking-widest hover:bg-indigo-700 active:scale-95 shadow-lg shadow-indigo-100">Pinjam</button>
+              </div>
+            </div>
+          ))}
         </div>
-      ) : (
-        <>
-          <div className="flex flex-col md:flex-row gap-4 mb-8">
-            <div className="relative flex-grow">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={22} />
-              <input 
-                type="text" 
-                placeholder={`Cari di ${selectedCategory}...`} 
-                className="w-full pl-12 pr-6 py-4 rounded-3xl border border-gray-200 focus:outline-none focus:ring-4 focus:ring-indigo-100 shadow-sm text-lg transition-all font-bold" 
-                value={searchTerm} 
-                onChange={(e) => setSearchTerm(e.target.value)} 
-              />
-            </div>
-            <div className="relative min-w-[200px]">
-              <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-              <select 
-                className="w-full pl-12 pr-6 py-4 rounded-3xl border border-gray-200 focus:outline-none focus:ring-4 focus:ring-indigo-100 shadow-sm text-lg transition-all font-bold appearance-none bg-white cursor-pointer"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-              >
-                <option value="Semua">Semua Status</option>
-                <option value="Tersedia">Tersedia</option>
-                <option value="Dipinjam">Dipinjam</option>
-              </select>
-            </div>
-          </div>
-          
-          {filteredItems.length === 0 ? (
-            <div className="p-12 text-center text-gray-400 font-bold italic">Tidak ada data ditemukan.</div>
-          ) : (
-            <div className="grid grid-cols-1 gap-4">
-              {filteredItems.map(item => (
-                <div key={item.id} className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-6 group hover:border-indigo-200 transition-all">
-                  <div className="flex gap-5">
-                    <div className="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-                      {item.kategori === 'Kendaraan Dinas' ? <Car size={28}/> : item.kategori === 'Peralatan Elektronik' ? <Laptop size={28}/> : <Package size={28}/>}
-                    </div>
-                    <div><h4 className="font-bold text-gray-900 text-lg group-hover:text-indigo-700 transition-colors leading-tight uppercase">{item.nama}</h4><p className="text-sm text-gray-500 font-medium mt-1">{item.kategori === 'Kendaraan Dinas' ? item.noPlat : (item.kategori === 'Peralatan Elektronik' || item.kategori === 'Barang Lain' ? `${item.merek || ''} - ${item.nup || ''}` : item.spek)}</p></div>
-                  </div>
-                  <div className="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-t-0 pt-4 sm:pt-0">
-                     <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${item.status === 'Tersedia' ? 'bg-green-50 text-green-700 border-green-100' : item.status === 'Dipinjam' ? 'bg-orange-50 text-orange-700 border-orange-100' : 'bg-red-50 text-red-700 border-red-100'}`}>{item.status}</span>
-                     <button onClick={() => { if (currentUser) { showNotification(`Peminjaman ${item.nama} sedang diproses untuk ${currentUser.nama}.`); } else { setView('login_portal'); } }} className="bg-indigo-600 text-white px-10 py-3 rounded-2xl text-sm font-black uppercase tracking-widest hover:bg-indigo-700 active:scale-95 shadow-lg shadow-indigo-100">Pinjam</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </>
       )}
     </div>
   );
@@ -586,15 +524,10 @@ function AdminPanel({ data, setData, users, setUsers, appSettings, setAppSetting
   const [userFormData, setUserFormData] = useState({ nama: '', nip: '', email: '', whatsapp: '', username: '', password: '' });
   const [addUserFormData, setAddUserFormData] = useState({ nama: '', nip: '', email: '', whatsapp: '', username: '' });
   const handleAddOrEdit = (e) => { e.preventDefault(); const finalData = { ...formData, kategori: activeAssetTab }; if (editingItem) { setData(data.map(item => item.id === editingItem.id ? { ...finalData, id: item.id } : item)); showNotification("Data fasilitas berhasil diperbarui!"); } else { setData([...data, { ...finalData, id: Date.now() }]); showNotification("Data fasilitas baru berhasil ditambahkan!"); } closeModal(); };
-  const handleEditUser = async (e) => { e.preventDefault(); try { const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', editingUser.username); await setDoc(userRef, { ...editingUser, ...userFormData, nama: userFormData.nama.toUpperCase() }, { merge: true }); showNotification("Data profil pengguna berhasil diperbarui!"); setIsUserModalOpen(false); } catch (err) { showNotification("Gagal memperbarui data."); } };
-  const handleAddUserSubmit = async (e) => { e.preventDefault(); if (!/^\d+$/.test(addUserFormData.whatsapp) || !addUserFormData.whatsapp.startsWith('0')) { showNotification("WhatsApp harus angka dan diawali 0."); return; } if (!/^\d+$/.test(addUserFormData.nip)) { showNotification("NIP harus numerik (0 jika tidak ada)."); return; } if (users.some(u => u.username === addUserFormData.username || u.email === addUserFormData.email || (addUserFormData.nip !== "0" && u.nip === addUserFormData.nip))) { showNotification("Identitas (Username/Email/NIP) sudah terdaftar."); return; } try { const newUser = { ...addUserFormData, id: Date.now().toString(), password: 'password123', role: 'user', historyTerlambat: 0, historyRusak: 0, foto: null, nama: addUserFormData.nama.toUpperCase() }; const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', newUser.username); await setDoc(userRef, newUser); setIsAddUserModalOpen(false); setAddUserFormData({ nama: '', nip: '', email: '', whatsapp: '', username: '' }); showNotification(`Pengguna ${newUser.nama} berhasil ditambahkan!`); } catch (err) { showNotification("Gagal menambah pengguna."); } };
-  const resetUserPassword = async (username) => { try { const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', username); await setDoc(userRef, { password: 'password123' }, { merge: true }); showNotification("Sandi pengguna telah direset ke default."); } catch (err) { showNotification("Gagal reset sandi."); } };
-  const deleteUser = async (username) => { try { const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', username); await deleteDoc(userRef); showNotification("Akun pengguna telah dihapus permanen."); } catch (err) { showNotification("Gagal menghapus akun."); } };
   const openModal = (item = null) => { if (item) { setEditingItem(item); setFormData(item); } else { setEditingItem(null); setFormData({ nama: activeAssetTab === 'Peralatan Elektronik' ? ELEKTRONIK_OPTIONS[0] : '', kategori: activeAssetTab, status: 'Tersedia', spek: '', noPlat: '', noRangka: '', noMesin: '', kilometer: '', tglOliMesin: '', tglOliMesinNext: '', tglOliPerseneling: '', tglOliPersenelingNext: '', tglPajak: '', deskripsiRusak: '', nup: '', merek: '', peminjam: '', usernamePeminjam: '', tglPinjam: '', tglKembali: '' }); } setIsModalOpen(true); };
   const closeModal = () => { setIsModalOpen(false); setEditingItem(null); };
   const openDetailModal = (item) => { setSelectedDetailItem(item); setIsDetailModalOpen(true); };
   const closeDetailModal = () => { setIsDetailModalOpen(false); setSelectedDetailItem(null); };
-  const handleImportExcel = (e) => { const file = e.target.files[0]; if (!file || typeof window.XLSX === 'undefined') return; const reader = new FileReader(); reader.onload = (evt) => { try { const wb = window.XLSX.read(evt.target.result, { type: 'binary' }); const ws = wb.Sheets[wb.SheetNames[0]]; const importedData = window.XLSX.utils.sheet_to_json(ws); const otherCategoriesData = data.filter(item => item.kategori !== activeAssetTab); const newCategoryData = importedData.map((item, idx) => ({ ...item, id: item.id || Date.now() + idx, kategori: activeAssetTab })); setData([...otherCategoriesData, ...newCategoryData]); showNotification(`Unggah data ke ${activeAssetTab} berhasil!`); e.target.value = null; } catch (err) { showNotification("Gagal memproses file Excel."); } }; reader.readAsBinaryString(file); };
   return (
     <div className="max-w-6xl mx-auto p-4 sm:p-8 animate-in slide-in-from-bottom-2">
       <div className="flex flex-wrap bg-white p-2 rounded-3xl shadow-sm border border-gray-100 mb-8 w-full sm:w-max gap-1">
@@ -606,65 +539,35 @@ function AdminPanel({ data, setData, users, setUsers, appSettings, setAppSetting
       {adminSubView === 'assets' ? (
         <AdminAssetsSection activeAssetTab={activeAssetTab} setActiveAssetTab={setActiveAssetTab} data={data} setData={setData} openModal={openModal} openDetailModal={openDetailModal} showNotification={showNotification} adminSearch={adminSearch} setAdminSearch={setAdminSearch} adminStatusFilter={adminStatusFilter} setAdminStatusFilter={setAdminStatusFilter} exportCategoryExcel={exportCategoryExcel} onImportClick={() => fileInputRef.current?.click()} appSettings={appSettings} />
       ) : adminSubView === 'users' ? (
-        <AdminUsersSection users={users} data={data} userSearch={userSearch} setUserSearch={setUserSearch} onAddClick={() => setIsAddUserModalOpen(true)} onEdit={(u) => { setEditingUser(u); setUserFormData({nama: u.nama, nip: u.nip, email: u.email, whatsapp: u.whatsapp, username: u.username, password: u.password}); setIsUserModalOpen(true); }} onReset={(u) => resetUserPassword(u.username)} onDelete={(u) => deleteUser(u.username)} onExportUsers={onExportUsers} onImportUsers={() => userFileInputRef.current?.click()} />
+        <AdminUsersSection users={users} data={data} userSearch={userSearch} setUserSearch={setUserSearch} onAddClick={() => setIsAddUserModalOpen(true)} onEdit={(u) => { setEditingUser(u); setUserFormData({nama: u.nama, nip: u.nip, email: u.email, whatsapp: u.whatsapp, username: u.username, password: u.password}); setIsUserModalOpen(true); }} onReset={(u) => { const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', u.username); setDoc(userRef, { password: 'password123' }, { merge: true }); showNotification("Password direset ke password123"); }} onDelete={(u) => { deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', u.username)); showNotification("User dihapus"); }} onExportUsers={onExportUsers} onImportUsers={() => userFileInputRef.current?.click()} />
       ) : adminSubView === 'profile' ? (
         <AdminProfileSection adminProfile={adminProfile} setAdminProfile={setAdminProfile} showNotification={showNotification} />
       ) : (
         <AppSettingsSection appSettings={appSettings} setAppSettings={setAppSettings} showNotification={showNotification} />
       )}
-      <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx, .xls, .csv" onChange={handleImportExcel} />
+      <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx, .xls, .csv" onChange={(e) => { const file = e.target.files[0]; if (!file || typeof window.XLSX === 'undefined') return; const reader = new FileReader(); reader.onload = (evt) => { const wb = window.XLSX.read(evt.target.result, { type: 'binary' }); const ws = wb.Sheets[wb.SheetNames[0]]; const importedData = window.XLSX.utils.sheet_to_json(ws); const otherCategoriesData = data.filter(item => item.kategori !== activeAssetTab); const newCategoryData = importedData.map((item, idx) => ({ ...item, id: item.id || Date.now() + idx, kategori: activeAssetTab })); setData([...otherCategoriesData, ...newCategoryData]); showNotification(`Unggah data ke ${activeAssetTab} berhasil!`); e.target.value = null; }; reader.readAsBinaryString(file); }} />
       <input type="file" ref={userFileInputRef} className="hidden" accept=".xlsx, .xls, .csv" onChange={onImportUsersExcel} />
-      {isAddUserModalOpen && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
-            <div className="p-8 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10"><div className="flex items-center gap-3"><UserPlus className="text-indigo-600" /><h3 className="text-2xl font-black text-gray-900 uppercase tracking-tight">Tambah Pengguna Baru</h3></div><button onClick={() => setIsAddUserModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-xl"><X /></button></div>
-            <form onSubmit={handleAddUserSubmit} className="p-8 space-y-4 text-left">
-              <div><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nama Lengkap (Wajib)</label><input required value={addUserFormData.nama} onChange={e => setAddUserFormData({...addUserFormData, nama: e.target.value.toUpperCase()})} className="w-full px-5 py-3.5 bg-gray-50 border-none rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold uppercase" placeholder="NAMA LENGKAP" /></div>
-              <div className="grid grid-cols-2 gap-4"><div><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">NIP (0 Jika Tidak Ada)</label><input required value={addUserFormData.nip} onChange={e => setAddUserFormData({...addUserFormData, nip: e.target.value})} className="w-full px-5 py-3.5 bg-gray-50 border-none rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold" placeholder="19XXXXXXXX" /></div><div><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Username</label><input required value={addUserFormData.username} onChange={e => setAddUserFormData({...addUserFormData, username: e.target.value.toLowerCase().replace(/\s/g, '')})} className="w-full px-5 py-3.5 bg-gray-50 border-none rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold" placeholder="username" /></div></div>
-              <div><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Email Kantor (format: abc@mail.com)</label><input type="email" required value={addUserFormData.email} onChange={e => setAddUserFormData({...addUserFormData, email: e.target.value})} className="w-full px-5 py-3.5 bg-gray-50 border-none rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold" placeholder="nama@mail.com" /></div>
-              <div><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">No. WhatsApp (Awalan 08...)</label><input required value={addUserFormData.whatsapp} onChange={e => setAddUserFormData({...addUserFormData, whatsapp: e.target.value})} className="w-full px-5 py-3.5 bg-gray-50 border-none rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold" placeholder="08XXXXXXXX" /></div>
-              <div className="bg-indigo-50 p-4 rounded-2xl border border-indigo-100 flex items-center gap-3"><Info size={18} className="text-indigo-600" /><p className="text-[10px] font-bold text-indigo-700 uppercase leading-relaxed">Sandi default: <span className="underline italic">password123</span>. Pengguna dapat mengubahnya di profil masing-masing.</p></div>
-              <div className="flex gap-4 pt-6"><button type="button" onClick={() => setIsAddUserModalOpen(false)} className="flex-1 py-4 bg-gray-100 rounded-[1.5rem] font-bold uppercase text-xs">Batal</button><button type="submit" className="flex-1 py-4 bg-indigo-600 text-white rounded-[1.5rem] font-bold uppercase shadow-xl text-xs">Tambah Pegawai</button></div>
-            </form>
-          </div>
-        </div>
-      )}
-      {isUserModalOpen && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
-            <div className="p-8 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10"><h3 className="text-2xl font-black text-gray-900 uppercase tracking-tight">Edit Data Pegawai</h3><button onClick={() => setIsUserModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-xl"><X /></button></div>
-            <form onSubmit={handleEditUser} className="p-8 space-y-4 text-left">
-              <div><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nama Lengkap</label><input required value={userFormData.nama} onChange={e => setUserFormData({...userFormData, nama: e.target.value.toUpperCase()})} className="w-full px-5 py-3.5 bg-gray-50 border-none rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold" /></div>
-              <div><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">NIP</label><input required value={userFormData.nip} onChange={e => setUserFormData({...userFormData, nip: e.target.value})} className="w-full px-5 py-3.5 bg-gray-50 border-none rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold" /></div>
-              <div><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Email Kantor</label><input type="email" required value={userFormData.email} onChange={e => setUserFormData({...userFormData, email: e.target.value})} className="w-full px-5 py-3.5 bg-gray-50 border-none rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold" /></div>
-              <div><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">WhatsApp</label><input required value={userFormData.whatsapp} onChange={e => setUserFormData({...userFormData, whatsapp: e.target.value})} className="w-full px-5 py-3.5 bg-gray-50 border-none rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold" /></div>
-              <div className="flex gap-4 pt-6"><button type="button" onClick={() => setIsUserModalOpen(false)} className="flex-1 py-4 bg-gray-100 rounded-[1.5rem] font-bold uppercase text-xs">Batal</button><button type="submit" className="flex-1 py-4 bg-indigo-600 text-white rounded-[1.5rem] font-bold uppercase shadow-xl text-xs">Simpan</button></div>
-            </form>
-          </div>
-        </div>
-      )}
+      {isAddUserModalOpen && <AddUserModal onSubmit={handleAddUserSubmit} users={users} onClose={() => setIsAddUserModalOpen(false)} formData={addUserFormData} setFormData={setAddUserFormData} />}
+      {isUserModalOpen && <EditUserModal onSubmit={handleEditUser} onClose={() => setIsUserModalOpen(false)} formData={userFormData} setFormData={setUserFormData} editingUser={editingUser} db={db} appId={appId} showNotification={showNotification} />}
       {isModalOpen && <AssetModal activeAssetTab={activeAssetTab} editingItem={editingItem} formData={formData} setFormData={setFormData} closeModal={closeModal} handleAddOrEdit={handleAddOrEdit} />}
       {isDetailModalOpen && <AssetDetailModal selectedDetailItem={selectedDetailItem} closeDetailModal={closeDetailModal} />}
     </div>
   );
 }
 
+// ============= SUB COMPONENT DEFINITIONS =============
+
 function AdminAssetsSection({ activeAssetTab, setActiveAssetTab, data, setData, openModal, openDetailModal, showNotification, adminSearch, setAdminSearch, adminStatusFilter, setAdminStatusFilter, exportCategoryExcel, onImportClick, appSettings }) {
   const handleDelete = (id) => { setData(data.filter(item => item.id !== id)); showNotification("Data fasilitas dihapus."); };
   const today = new Date().toISOString().split('T')[0];
-  const filteredAndSortedData = data.filter(item => {
-    const matchCategory = item.kategori === activeAssetTab;
+  const categoryData = data.filter(item => item.kategori === activeAssetTab);
+  const stats = { total: categoryData.length, available: categoryData.filter(i => i.status === 'Tersedia').length, borrowed: categoryData.filter(i => i.status === 'Dipinjam').length, damaged: categoryData.filter(i => i.status === 'Rusak').length };
+  const filteredAndSortedData = categoryData.filter(item => {
     const searchString = adminSearch.toLowerCase();
     const matchSearch = item.nama.toLowerCase().includes(searchString) || (item.noPlat && item.noPlat.toLowerCase().includes(searchString)) || (item.nup && item.nup.toLowerCase().includes(searchString)) || (item.merek && item.merek.toLowerCase().includes(searchString)) || (item.peminjam && item.peminjam.toLowerCase().includes(searchString));
     const matchStatus = adminStatusFilter === 'Semua' ? true : item.status === adminStatusFilter;
-    return matchCategory && matchSearch && matchStatus;
-  }).sort((a, b) => {
-    if (a.tglKembali && b.tglKembali) return a.tglKembali.localeCompare(b.tglKembali);
-    if (a.tglKembali) return -1; if (b.tglKembali) return 1; return 0;
-  });
-  const isDbMissing = (activeAssetTab === 'Kendaraan Dinas' && (!appSettings.linkDbKendaraan || appSettings.linkDbKendaraan.trim() === '')) ||
-                     (activeAssetTab === 'Peralatan Elektronik' && (!appSettings.linkDbElektronik || appSettings.linkDbElektronik.trim() === '')) ||
-                     (activeAssetTab === 'Barang Lain' && (!appSettings.linkDbBarangLain || appSettings.linkDbBarangLain.trim() === ''));
+    return matchSearch && matchStatus;
+  }).sort((a, b) => { if (a.tglKembali && b.tglKembali) return a.tglKembali.localeCompare(b.tglKembali); return 0; });
   return (
     <div className="animate-in fade-in">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-8 text-left">
@@ -672,76 +575,81 @@ function AdminAssetsSection({ activeAssetTab, setActiveAssetTab, data, setData, 
         <div className="flex flex-wrap gap-3"><button onClick={onImportClick} className="flex-1 sm:flex-none bg-emerald-50 text-emerald-700 border border-emerald-100 px-5 py-3 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-100 transition-all text-xs uppercase tracking-widest"><Upload size={18} /> Unggah</button><button onClick={() => exportCategoryExcel(activeAssetTab)} className="flex-1 sm:flex-none bg-blue-50 text-blue-700 border border-blue-100 px-5 py-3 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-blue-100 transition-all text-xs uppercase tracking-widest"><Download size={18} /> Unduh</button><button onClick={() => openModal()} className="flex-1 sm:flex-none bg-indigo-600 text-white px-6 py-3 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-indigo-700 shadow-xl uppercase tracking-widest text-xs"><Plus size={20} /> Tambah</button></div>
       </div>
       <div className="flex flex-wrap gap-2 mb-6 p-1.5 bg-gray-100/50 rounded-2xl w-full sm:w-max">{CATEGORIES.map((cat) => (<button key={cat.id} onClick={() => { setActiveAssetTab(cat.id); setAdminSearch(''); setAdminStatusFilter('Semua'); }} className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs transition-all uppercase tracking-wider ${activeAssetTab === cat.id ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-200/50'}`}>{cat.id === 'Kendaraan Dinas' ? <Car size={16}/> : cat.id === 'Peralatan Elektronik' ? <Laptop size={16}/> : <Package size={16}/>}{cat.id}</button>))}</div>
-      {isDbMissing && data.filter(i => i.kategori === activeAssetTab).length === 0 ? (
-        <div className="bg-white p-20 rounded-[3rem] border border-dashed border-gray-200 text-center">
-           <Database size={60} className="mx-auto text-gray-200 mb-4" />
-           <h3 className="text-xl font-black text-gray-300 uppercase tracking-tight">Database {activeAssetTab} Belum Terhubung</h3>
-           <p className="text-gray-400 text-sm mt-2 font-medium italic">Silakan isi link spreadsheet database di menu <span className="font-bold">Sistem</span> untuk memuat data secara otomatis.</p>
-        </div>
-      ) : (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6"><div className="md:col-span-2 relative"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} /><input type="text" placeholder={`Cari nama, plat, NUP, atau peminjam...`} className="w-full pl-12 pr-4 py-3.5 bg-white border border-gray-100 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold shadow-sm" value={adminSearch} onChange={(e) => setAdminSearch(e.target.value)} /></div><div className="relative"><Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} /><select className="w-full pl-12 pr-4 py-3.5 bg-white border border-gray-100 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold shadow-sm appearance-none cursor-pointer" value={adminStatusFilter} onChange={(e) => setAdminStatusFilter(e.target.value)}><option value="Semua">Semua Status</option><option value="Tersedia">Tersedia</option><option value="Dipinjam">Dipinjam</option><option value="Rusak">Rusak</option></select></div></div>
-          <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-left text-sm min-w-[1100px]"><thead className="bg-gray-50/50 border-b border-gray-100"><tr><th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest w-64">Detail Barang</th>{activeAssetTab === 'Kendaraan Dinas' ? (<th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest hidden md:table-cell">Plat Nomor</th>) : (activeAssetTab === 'Peralatan Elektronik' || activeAssetTab === 'Barang Lain') ? (<><th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest hidden md:table-cell">Merek</th><th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest hidden md:table-cell">NUP</th></>) : (<th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest hidden md:table-cell">Spek Singkat</th>)}<th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest">Peminjam</th><th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest">Tgl Pinjam</th><th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest">Tgl Kembali</th><th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest text-center">Status</th><th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest text-right">Aksi</th></tr></thead><tbody className="divide-y divide-gray-50">{filteredAndSortedData.map(item => { const isDueToday = item.status === 'Dipinjam' && item.tglKembali === today; return (<tr key={item.id} className={`transition-colors group ${isDueToday ? 'bg-red-50 hover:bg-red-100/50' : 'hover:bg-indigo-50/30'}`}><td className="px-6 py-5"><div className="flex items-center gap-4"><div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${isDueToday ? 'bg-red-200 text-red-700' : (item.kategori === 'Kendaraan Dinas' ? 'bg-indigo-50 text-indigo-600' : item.kategori === 'Peralatan Elektronik' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600')}`}>{item.kategori === 'Kendaraan Dinas' ? <Car size={24}/> : item.kategori === 'Peralatan Elektronik' ? <Laptop size={24}/> : <Package size={24}/>}</div><div><div className={`font-bold group-hover:text-indigo-700 transition-colors leading-tight uppercase ${isDueToday ? 'text-red-700' : 'text-gray-900'}`}>{item.nama}</div><div className="text-xs text-gray-400 font-medium mt-1">{activeAssetTab === 'Kendaraan Dinas' ? item.noPlat : (activeAssetTab === 'Peralatan Elektronik' || activeAssetTab === 'Barang Lain' ? item.merek : item.spek)}</div></div></div></td>{activeAssetTab === 'Kendaraan Dinas' ? (<td className={`px-6 py-5 hidden md:table-cell font-mono font-bold ${isDueToday ? 'text-red-600' : 'text-gray-600'}`}>{item.noPlat}</td>) : (activeAssetTab === 'Peralatan Elektronik' || activeAssetTab === 'Barang Lain') ? (<><td className={`px-6 py-5 hidden md:table-cell font-bold ${isDueToday ? 'text-red-600' : 'text-gray-600'}`}>{item.merek}</td><td className="px-6 py-5 hidden md:table-cell font-mono text-gray-500">{item.nup}</td></>) : (<td className="px-6 py-5 hidden md:table-cell text-gray-500 italic text-xs">{item.spek}</td>)}<td className="px-6 py-5 font-bold uppercase">{item.status === 'Dipinjam' ? (<div className="flex items-center gap-2"><UserCircle size={16} className={isDueToday ? 'text-red-600' : 'text-orange-500'} /><span className={isDueToday ? 'text-red-800' : 'text-gray-800'}>{item.peminjam}</span></div>) : (<span className="text-gray-300">-</span>)}</td><td className="px-6 py-5 font-medium text-gray-500">{item.status === 'Dipinjam' ? item.tglPinjam : "-"}</td><td className={`px-6 py-5 font-black ${isDueToday ? 'text-red-600 animate-pulse' : 'text-gray-600'}`}>{item.status === 'Dipinjam' ? (<div className="flex items-center gap-1"><Clock size={14} />{item.tglKembali || 'Belum diatur'}</div>) : "-"}</td><td className="px-6 py-5 text-center"><span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${isDueToday ? 'bg-red-600 text-white border-red-700' : (item.status === 'Tersedia' ? 'bg-green-50 text-green-700 border-green-100' : item.status === 'Dipinjam' ? 'bg-orange-50 text-orange-700 border-orange-100' : 'bg-red-50 text-red-700 border-red-100')}`}>{isDueToday ? 'Jatuh Tempo' : item.status}</span></td><td className="px-6 py-4 text-right"><div className="flex items-center justify-end gap-1">{(activeAssetTab === 'Kendaraan Dinas' || activeAssetTab === 'Peralatan Elektronik' || activeAssetTab === 'Barang Lain') && (<button onClick={() => openDetailModal(item)} className={`p-2.5 rounded-xl transition-all ${isDueToday ? 'text-red-600 hover:bg-red-200' : 'text-indigo-400 hover:text-indigo-700 hover:bg-indigo-50'}`} title="Rincian Detail"><FileText size={20} /></button>)}<button onClick={() => openModal(item)} className="p-2.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all" title="Edit Data"><Edit size={20} /></button><button onClick={() => handleDelete(item.id)} className="p-2.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all" title="Hapus Data"><Trash2 size={20} /></button></div></td></tr>); })}</tbody></table></div></div>
-        </>
-      )}
+      <StatusInfographic stats={stats} currentFilter={adminStatusFilter} onFilterChange={setAdminStatusFilter} />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6"><div className="md:col-span-2 relative"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} /><input type="text" placeholder={`Cari nama, plat, NUP, atau peminjam...`} className="w-full pl-12 pr-4 py-3.5 bg-white border border-gray-100 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold shadow-sm" value={adminSearch} onChange={(e) => setAdminSearch(e.target.value)} /></div><div className="relative"><Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} /><select className="w-full pl-12 pr-4 py-3.5 bg-white border border-gray-100 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold shadow-sm appearance-none cursor-pointer" value={adminStatusFilter} onChange={(e) => setAdminStatusFilter(e.target.value)}><option value="Semua">Semua Status</option><option value="Tersedia">Tersedia</option><option value="Dipinjam">Dipinjam</option><option value="Rusak">Rusak</option></select></div></div>
+      <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-left text-sm min-w-[1100px]"><thead className="bg-gray-50/50 border-b border-gray-100"><tr><th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest w-64">Detail Barang</th><th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest">Peminjam</th><th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest">Tgl Kembali</th><th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest text-center">Status</th><th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest text-right">Aksi</th></tr></thead><tbody className="divide-y divide-gray-50">{filteredAndSortedData.map(item => (<tr key={item.id} className="hover:bg-slate-50 transition-colors"><td className="px-6 py-5 flex items-center gap-4"><div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">{item.kategori === 'Kendaraan Dinas' ? <Car size={20}/> : item.kategori === 'Peralatan Elektronik' ? <Laptop size={20}/> : <Package size={20}/>}</div><div><div className="font-bold text-gray-900 uppercase">{item.nama}</div><div className="text-[10px] text-gray-400">{item.noPlat || item.nup}</div></div></td><td className="px-6 py-5 font-medium">{item.peminjam || '-'}</td><td className="px-6 py-5 font-black text-gray-600">{item.tglKembali || '-'}</td><td className="px-6 py-5 text-center"><span className={`px-4 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${item.status === 'Tersedia' ? 'bg-green-50 text-green-700' : 'bg-orange-50 text-orange-700'}`}>{item.status}</span></td><td className="px-6 py-4 text-right flex justify-end gap-2"><button onClick={() => openDetailModal(item)} className="p-2 text-indigo-400 hover:bg-indigo-50 rounded-lg"><FileText size={18}/></button><button onClick={() => openModal(item)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-lg"><Edit size={18}/></button><button onClick={() => handleDelete(item.id)} className="p-2 text-red-400 hover:bg-red-50 rounded-lg"><Trash2 size={18}/></button></td></tr>))}</tbody></table></div></div>
     </div>
   );
 }
 
-function AdminUsersSection({ users, data, userSearch, setUserSearch, onAddClick, onEdit, onReset, onDelete, onExportUsers, onImportUsers }) {
-  const calculateRating = (late, damaged) => { if (late > 8 || damaged >= 8) return 1; if (late > 6 || damaged > 6) return 2; if (late > 3 || damaged > 3) return 3; if (late >= 1 || damaged >= 1) return 4; return 5; };
-  const getUserBorrowInfo = (username) => data.find(item => item.status === 'Dipinjam' && (item.usernamePeminjam === username || item.peminjam === username));
-  const filteredSortedUsers = users.filter(u => { const borrow = getUserBorrowInfo(u.username); const searchString = userSearch.toLowerCase(); return u.nama.toLowerCase().includes(searchString) || (borrow && borrow.nama.toLowerCase().includes(searchString)); }).sort((a, b) => { const bA = getUserBorrowInfo(a.username); const bB = getUserBorrowInfo(b.username); if (bA && bB) return bA.tglKembali.localeCompare(bB.tglKembali); if (bA) return -1; if (bB) return 1; return 0; });
+function AddUserModal({ onSubmit, users, onClose, formData, setFormData }) {
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-2 text-left">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
-        <div className="uppercase tracking-tight"><h2 className="text-2xl font-black text-gray-900 mb-1">Kedisiplinan Pengguna</h2><p className="text-gray-400 text-sm font-medium italic lowercase">Monitoring rekam jejak penggunaan fasilitas kantor.</p></div>
-        <div className="flex flex-wrap gap-3"><button onClick={onImportUsers} className="bg-emerald-50 text-emerald-700 border border-emerald-100 px-5 py-4 rounded-[1.8rem] font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 hover:bg-emerald-100 transition-all active:scale-95 shadow-sm"><Upload size={16} /> Unggah Data</button><button onClick={onExportUsers} className="bg-blue-50 text-blue-700 border border-blue-100 px-5 py-4 rounded-[1.8rem] font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 hover:bg-blue-100 transition-all active:scale-95 shadow-sm"><Download size={16} /> Unduh Data</button><button onClick={onAddClick} className="bg-indigo-600 text-white px-8 py-4 rounded-[1.8rem] font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95"><UserPlus size={18} /> Tambah Pengguna</button></div>
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in">
+      <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+        <div className="p-8 border-b border-gray-100 flex items-center justify-between bg-white z-10"><div className="flex items-center gap-3"><UserPlus className="text-indigo-600" /><h3 className="text-2xl font-black text-gray-900 uppercase tracking-tight">Tambah Pengguna Baru</h3></div><button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-xl"><X /></button></div>
+        <form onSubmit={onSubmit} className="p-8 space-y-4 text-left">
+          <div><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nama Lengkap</label><input required value={formData.nama} onChange={e => setFormData({...formData, nama: e.target.value.toUpperCase()})} className="w-full px-5 py-3.5 bg-gray-50 border-none rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold uppercase" /></div>
+          <div className="grid grid-cols-2 gap-4"><div><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">NIP</label><input required value={formData.nip} onChange={e => setFormData({...formData, nip: e.target.value})} className="w-full px-5 py-3.5 bg-gray-50 border-none rounded-2xl outline-none font-bold" /></div><div><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Username</label><input required value={formData.username} onChange={e => setFormData({...formData, username: e.target.value.toLowerCase().replace(/\s/g, '')})} className="w-full px-5 py-3.5 bg-gray-50 border-none rounded-2xl outline-none font-bold" /></div></div>
+          <div><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Email</label><input type="email" required value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full px-5 py-3.5 bg-gray-50 border-none rounded-2xl outline-none font-bold" /></div>
+          <div className="flex gap-4 pt-6"><button type="button" onClick={onClose} className="flex-1 py-4 bg-gray-100 rounded-2xl font-bold">Batal</button><button type="submit" className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-bold">Tambah</button></div>
+        </form>
       </div>
-      <div className="relative mb-8"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} /><input type="text" placeholder="Cari Nama Pengguna atau Nama Barang yang sedang dipinjam..." className="w-full pl-12 pr-6 py-4 bg-white border border-gray-100 rounded-3xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold shadow-sm transition-all" value={userSearch} onChange={(e) => setUserSearch(e.target.value)} /></div>
-      <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-left text-sm min-w-[1200px]"><thead className="bg-gray-50/50 border-b border-gray-100"><tr><th className="px-6 py-5 font-black text-gray-400 uppercase tracking-widest">Pengguna</th><th className="px-6 py-5 font-black text-gray-400 uppercase tracking-widest">Identitas NIP</th><th className="px-6 py-5 font-black text-gray-400 uppercase tracking-widest">Pinjaman Aktif</th><th className="px-6 py-5 font-black text-gray-400 uppercase tracking-widest">Jatuh Tempo</th><th className="px-6 py-5 font-black text-gray-400 uppercase tracking-widest text-center">Rating</th><th className="px-6 py-5 font-black text-gray-400 uppercase tracking-widest text-right">Aksi Akun</th></tr></thead><tbody className="divide-y divide-gray-50">{filteredSortedUsers.map(u => { const borrow = getUserBorrowInfo(u.username); const rating = calculateRating(u.historyTerlambat, u.historyRusak); const isVBad = rating === 1; const isMaster = u.username === 'admin'; return (<tr key={u.id} className={`transition-all ${isVBad ? 'bg-red-50 hover:bg-red-100/50' : 'hover:bg-indigo-50/20'}`}><td className="px-6 py-5"><div className="flex items-center gap-4"><div className="w-12 h-12 rounded-full bg-gray-100 border border-gray-200 overflow-hidden shrink-0 shadow-inner">{u.foto ? <img src={u.foto} alt="P" className="w-full h-full object-cover" /> : <UserCircle size={28} className="mx-auto mt-2 text-gray-300" />}</div><div><p className="font-black text-gray-900 leading-tight uppercase mb-0.5">{u.nama} {isMaster && <span className="text-[8px] bg-indigo-600 text-white px-1.5 py-0.5 rounded-full ml-1">MASTER</span>}</p><p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">@{u.username}</p></div></div></td><td className="px-6 py-5"><p className="text-[10px] font-black text-indigo-400 tracking-widest uppercase">NIP: {u.nip}</p></td><td className="px-6 py-5">{borrow ? (<div className="flex items-center gap-2 text-indigo-600 bg-indigo-50 px-4 py-2 rounded-xl font-black uppercase border border-indigo-100 w-max"><Package size={16} /><span>{borrow.nama}</span></div>) : <span className="text-gray-300 italic font-medium">Nihil</span>}</td><td className="px-6 py-5 font-black">{borrow ? (<div className={`flex items-center gap-1.5 ${borrow.tglKembali === new Date().toISOString().split('T')[0] ? 'text-red-600 animate-pulse' : 'text-gray-600'}`}><Clock size={16} />{borrow.tglKembali}</div>) : "-"}</td><td className="px-6 py-5"><div className="flex flex-col items-center"><div className="flex gap-1">{[1,2,3,4,5].map(s => (<Star key={s} size={16} fill={s <= rating ? (isVBad ? "#ef4444" : "#f59e0b") : "none"} stroke={s <= rating ? (isVBad ? "#ef4444" : "#f59e0b") : "#d1d5db"} />))}</div><p className={`text-[9px] font-black mt-2 uppercase tracking-widest ${isVBad ? 'text-red-600' : 'text-gray-400'}`}>L: {u.historyTerlambat} | R: {u.historyRusak}</p></div></td><td className="px-6 py-5 text-right"><div className="flex items-center justify-end gap-1.5"><button onClick={() => onReset(u)} className="p-2.5 text-amber-500 hover:bg-amber-50 rounded-xl transition-all border border-transparent hover:border-amber-100" title="Reset Password"><RotateCcw size={20}/></button><button onClick={() => onEdit(u)} className="p-2.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all border border-transparent hover:border-indigo-100"><Edit size={20}/></button><button onClick={() => !isMaster && onDelete(u)} className={`p-2.5 rounded-xl transition-all border border-transparent ${isMaster ? 'text-gray-200 cursor-not-allowed' : 'text-gray-400 hover:text-red-600 hover:bg-red-50 hover:border-red-100'}`} disabled={isMaster}><Trash2 size={20}/></button></div></td></tr>); })}</tbody></table></div></div>
     </div>
   );
 }
 
-function AdminProfileSection({ adminProfile, setAdminProfile, showNotification }) {
-  const [showPassword, setShowPassword] = useState(false);
-  const handlePhotoChange = (e) => { const file = e.target.files[0]; if (file) { const reader = new FileReader(); reader.onloadend = () => { setAdminProfile({ ...adminProfile, foto: reader.result }); showNotification("Foto profil diperbarui!"); }; reader.readAsDataURL(file); } };
-  const handleSave = (e) => { e.preventDefault(); showNotification("Perubahan profil berhasil disimpan!"); };
+function EditUserModal({ onClose, formData, setFormData, editingUser, db, appId, showNotification }) {
+  const handleEditUser = async (e) => { e.preventDefault(); try { const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', editingUser.username); await setDoc(userRef, { ...editingUser, ...formData, nama: formData.nama.toUpperCase() }, { merge: true }); showNotification("Data profil pengguna berhasil diperbarui!"); onClose(); } catch (err) { console.error(err); } };
   return (
-    <div className="max-w-4xl mx-auto animate-in fade-in"><div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden"><div className="bg-indigo-600 h-32 relative"><div className="absolute -bottom-12 left-8 border-4 border-white rounded-[2.5rem] shadow-xl overflow-hidden bg-white group cursor-pointer transition-transform hover:scale-105"><img src={adminProfile.foto || 'https://via.placeholder.com/150'} alt="Admin" className="w-28 h-28 object-cover" /><label className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity cursor-pointer"><Camera size={24} /><input type="file" className="hidden" accept="image/*" onChange={handlePhotoChange} /></label></div></div><div className="pt-16 px-8 pb-10"><div className="flex items-center gap-3 mb-8 border-b border-gray-50 pb-4 text-left"><Settings className="text-indigo-600" size={28} /><div><h2 className="text-2xl font-black text-gray-900 leading-tight uppercase">Pengaturan Profil</h2><p className="text-gray-400 text-sm font-medium italic uppercase tracking-widest">Akun Kendali SIKOPIFASTA</p></div></div><form onSubmit={handleSave} className="space-y-8 text-left"><div className="grid grid-cols-1 md:grid-cols-2 gap-6"><div className="md:col-span-2"><h4 className="text-xs font-black text-indigo-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-2"><User size={14} /> Identitas Pegawai</h4></div><div className="space-y-2"><label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Nama Lengkap</label><input required value={adminProfile.nama} onChange={e => setAdminProfile({...adminProfile, nama: e.target.value.toUpperCase()})} className="w-full px-5 py-3.5 bg-gray-50 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold text-gray-800" /></div><div className="space-y-2"><label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">NIP</label><input required value={adminProfile.nip} onChange={e => setAdminProfile({...adminProfile, nip: e.target.value})} className="w-full px-5 py-3.5 bg-gray-50 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold" /></div><div className="space-y-2"><label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-1"><Mail size={12} /> Email</label><input type="email" required value={adminProfile.email} onChange={e => setAdminProfile({...adminProfile, email: e.target.value})} className="w-full px-5 py-3.5 bg-gray-50 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold" /></div><div className="space-y-2"><label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-1"><Phone size={12} /> WhatsApp</label><input type="tel" required value={adminProfile.whatsapp} onChange={e => setAdminProfile({...adminProfile, whatsapp: e.target.value})} className="w-full px-5 py-3.5 bg-gray-50 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold" /></div></div><div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-gray-50"><div className="md:col-span-2"><h4 className="text-xs font-black text-red-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-2"><Lock size={14} /> Keamanan Login</h4></div><div className="space-y-2"><label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Username</label><div className="relative"><Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} /><input required value={adminProfile.username} onChange={e => setAdminProfile({...adminProfile, username: e.target.value})} className="w-full pl-12 pr-5 py-3.5 bg-gray-50 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold text-indigo-700" /></div></div><div className="space-y-2"><label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Password</label><div className="relative"><Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} /><input type={showPassword ? "text" : "password"} value={adminProfile.password} onChange={e => setAdminProfile({...adminProfile, password: e.target.value})} className="w-full pl-12 pr-12 py-3.5 bg-gray-50 rounded-2xl focus:ring-4 focus:ring-red-100 outline-none font-bold text-gray-800" /><button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 transition-colors hover:text-indigo-600">{showPassword ? <EyeOff size={20} /> : <Eye size={20} />}</button></div></div></div><button type="submit" className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-lg shadow-xl hover:bg-indigo-700 transition-all active:scale-[0.98] mt-4 shadow-indigo-100 uppercase tracking-widest">SIMPAN PROFIL</button></form></div></div></div>
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
+      <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95">
+        <div className="p-8 border-b border-gray-100 flex items-center justify-between"><h3 className="text-2xl font-black text-gray-900 uppercase">Edit Pegawai</h3><button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-xl"><X /></button></div>
+        <form onSubmit={handleEditUser} className="p-8 space-y-4 text-left">
+          <div><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nama Lengkap</label><input required value={formData.nama} onChange={e => setFormData({...formData, nama: e.target.value.toUpperCase()})} className="w-full px-5 py-3.5 bg-gray-50 border-none rounded-2xl outline-none font-bold" /></div>
+          <div><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">WhatsApp</label><input required value={formData.whatsapp} onChange={e => setFormData({...formData, whatsapp: e.target.value})} className="w-full px-5 py-3.5 bg-gray-50 border-none rounded-2xl outline-none font-bold" /></div>
+          <div className="flex gap-4 pt-6"><button type="button" onClick={onClose} className="flex-1 py-4 bg-gray-100 rounded-2xl font-bold">Batal</button><button type="submit" className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-bold">Simpan</button></div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function AssetModal({ activeAssetTab, editingItem, formData, setFormData, closeModal, handleAddOrEdit }) {
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in"><div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 max-h-[90vh] overflow-y-auto"><div className="p-8 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10"><div className="flex items-center gap-3"><div className={`p-2 rounded-xl text-white ${activeAssetTab === 'Kendaraan Dinas' ? 'bg-indigo-600' : activeAssetTab === 'Peralatan Elektronik' ? 'bg-emerald-600' : 'bg-amber-600'}`}>{activeAssetTab === 'Kendaraan Dinas' ? <Car size={24} /> : activeAssetTab === 'Peralatan Elektronik' ? <Laptop size={24} /> : <Package size={24} />}</div><h3 className="text-2xl font-black text-gray-900 uppercase tracking-tight">{editingItem ? 'Edit' : 'Tambah'} {activeAssetTab}</h3></div><button onClick={closeModal} className="p-2 hover:bg-gray-100 rounded-xl transition-colors text-gray-400"><X /></button></div>
+      <form onSubmit={handleAddOrEdit} className="p-8 space-y-6 text-left">
+        {(activeAssetTab === 'Peralatan Elektronik' || activeAssetTab === 'Barang Lain') && (<div className="space-y-2"><label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">NUP</label><input required value={formData.nup} onChange={e => setFormData({...formData, nup: e.target.value})} className="w-full px-5 py-4 bg-gray-50 rounded-2xl outline-none font-bold" placeholder="LNN-2024-001" /></div>)}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6"><div className="space-y-2"><label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Nama Fasilitas</label>{activeAssetTab === 'Peralatan Elektronik' ? (<select value={formData.nama} onChange={e => setFormData({...formData, nama: e.target.value})} className="w-full px-4 py-4 bg-gray-50 rounded-2xl outline-none font-bold">{ELEKTRONIK_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}</select>) : (<input required value={formData.nama} onChange={e => setFormData({...formData, nama: e.target.value})} className="w-full px-5 py-4 bg-gray-50 rounded-2xl outline-none font-bold" />)}</div><div className="space-y-2"><label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Status</label><select value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})} className="w-full px-4 py-4 bg-gray-50 rounded-2xl outline-none font-bold"><option value="Tersedia">Tersedia</option><option value="Dipinjam">Dipinjam</option><option value="Rusak">Rusak</option></select></div></div>
+        <div className="flex gap-4 pt-6"><button type="button" onClick={closeModal} className="flex-1 py-4 rounded-2xl font-bold bg-gray-100">Batal</button><button type="submit" className="flex-1 bg-indigo-600 text-white py-4 rounded-2xl font-black">Simpan</button></div>
+      </form></div></div>
   );
 }
 
 function AssetDetailModal({ selectedDetailItem, closeDetailModal }) {
   if (!selectedDetailItem) return null;
   const isVehicle = selectedDetailItem.kategori === 'Kendaraan Dinas';
-  const isElectronic = selectedDetailItem.kategori === 'Peralatan Elektronik';
-  const isOther = selectedDetailItem.kategori === 'Barang Lain';
-  const themeColor = isVehicle ? 'bg-indigo-600' : isElectronic ? 'bg-emerald-600' : 'bg-amber-600';
-  const lightTheme = isVehicle ? 'bg-indigo-50 border-indigo-100' : isElectronic ? 'bg-emerald-50 border-emerald-100' : 'bg-amber-50 border-amber-100';
-  const textColor = isVehicle ? 'text-indigo-900' : isElectronic ? 'text-emerald-900' : 'text-amber-900';
+  const themeColor = isVehicle ? 'bg-indigo-600' : selectedDetailItem.kategori === 'Peralatan Elektronik' ? 'bg-emerald-600' : 'bg-amber-600';
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in">
-      <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 max-h-[90vh] flex flex-col">
+      <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
         <div className={`p-8 border-b border-gray-100 flex items-center justify-between ${themeColor} text-white`}>
-          <div className="flex items-center gap-3 text-left"><div className="bg-white/20 p-2 rounded-xl">{isVehicle ? <Car size={24} /> : isElectronic ? <Laptop size={24} /> : <Package size={24} />}</div><div><h3 className="text-xl font-black uppercase tracking-tight leading-none mb-1">Rincian Unit</h3><p className="text-white/80 text-[10px] font-medium italic uppercase tracking-widest leading-none">Informasi Aset SIKOPIFASTA</p></div></div>
-          <button onClick={closeDetailModal} className="p-2 hover:bg-white/10 rounded-xl transition-colors"><X /></button>
+          <div className="flex items-center gap-3 text-left"><div className="bg-white/20 p-2 rounded-xl">{isVehicle ? <Car size={24} /> : <Package size={24} />}</div><div><h3 className="text-xl font-black uppercase tracking-tight leading-none mb-1">Rincian Unit</h3><p className="text-white/80 text-[10px] uppercase">Informasi Aset</p></div></div>
+          <button onClick={closeDetailModal} className="p-2 hover:bg-white/10 rounded-xl"><X /></button>
         </div>
         <div className="p-8 overflow-y-auto space-y-8 text-left">
-          <div className={`flex flex-col sm:flex-row gap-6 items-start sm:items-center justify-between ${lightTheme} p-6 rounded-3xl border`}>
-            <div><h2 className={`text-3xl font-black ${textColor} uppercase leading-tight`}>{selectedDetailItem.nama}</h2><div className="flex items-center gap-2 mt-2">{isVehicle ? (<div className={`${themeColor} text-white px-4 py-1 rounded-lg font-mono font-bold text-lg tracking-wider`}>{selectedDetailItem.noPlat}</div>) : (<div className={`${themeColor} text-white px-4 py-1 rounded-lg font-mono font-bold text-sm tracking-tight`}>{selectedDetailItem.nup || '-'}</div>)}<span className={`px-4 py-1.5 rounded-lg text-xs font-black uppercase ${selectedDetailItem.status === 'Tersedia' ? 'bg-green-500 text-white' : selectedDetailItem.status === 'Dipinjam' ? 'bg-orange-50 text-orange-700 border-orange-100' : 'bg-red-50 text-red-700 border-red-100'}`}>{selectedDetailItem.status}</span></div></div>
-            {isVehicle && (<div className="flex flex-col items-end"><span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Odometer</span><div className="flex items-center gap-2 text-indigo-900"><Gauge size={20} /><span className="text-2xl font-black">{selectedDetailItem.kilometer} KM</span></div></div>)}
-            {(isElectronic || isOther) && (<div className="flex flex-col items-end text-right"><span className={`text-[10px] font-black ${textColor} opacity-60 uppercase tracking-widest`}>Merek</span><div className={`flex items-center gap-2 ${textColor}`}><Tag size={20} /><span className="text-2xl font-black uppercase tracking-tight leading-none">{selectedDetailItem.merek || '-'}</span></div></div>)}
+          <div className="p-6 bg-slate-50 rounded-3xl border border-gray-100">
+            <h2 className="text-3xl font-black text-slate-900 uppercase leading-tight">{selectedDetailItem.nama}</h2>
+            <div className="flex items-center gap-2 mt-2">
+              <div className={`${themeColor} text-white px-4 py-1 rounded-lg font-mono font-bold`}>{selectedDetailItem.noPlat || selectedDetailItem.nup}</div>
+              <span className={`px-4 py-1.5 rounded-lg text-xs font-black uppercase bg-white border border-gray-200`}>{selectedDetailItem.status}</span>
+            </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-4"><h4 className={`text-sm font-black text-gray-400 uppercase tracking-widest flex items-center gap-2 border-b pb-2`}><ClipboardList size={16} /> Identitas Fisik</h4><div className="space-y-3 text-sm font-medium"><div className="flex justify-between border-b pb-1"><span>ID Unit / Plat</span><span className="font-bold font-mono text-xs uppercase">{isVehicle ? selectedDetailItem.noPlat : selectedDetailItem.nup || '-'}</span></div>{isVehicle && (<><div className="flex justify-between border-b pb-1"><span>No. Rangka</span><span className="font-bold font-mono text-[10px]">{selectedDetailItem.noRangka || '-'}</span></div><div className="flex justify-between border-b pb-1"><span>No. Mesin</span><span className="font-bold font-mono text-[10px]">{selectedDetailItem.noMesin || '-'}</span></div><div className="flex justify-between"><span>Pajak Berikutnya</span><span className="font-bold text-amber-600 font-mono">{selectedDetailItem.tglPajak || '-'}</span></div></>)}{!isVehicle && (<div className="flex justify-between border-b pb-1"><span>Merek</span><span className="font-bold uppercase text-xs">{selectedDetailItem.merek || '-'}</span></div>)}<div className="flex justify-between"><span>Kategori</span><span className="font-bold text-xs uppercase">{selectedDetailItem.kategori}</span></div></div></div>
-            <div className="space-y-4"><h4 className={`text-sm font-black text-gray-400 uppercase tracking-widest flex items-center gap-2 border-b pb-2`}><Wrench size={16} /> {isVehicle ? 'Pemeliharaan' : 'Spesifikasi'}</h4>{isVehicle ? (<div className="space-y-4"><div className="bg-slate-50 p-4 rounded-2xl border border-gray-100 text-xs"><span className="font-black text-gray-400 uppercase block mb-2 tracking-widest">Oli Mesin</span><div className="flex justify-between text-center"><div><p className="text-gray-400 mb-0.5 font-bold uppercase text-[9px]">Terakhir</p><p className="font-bold font-mono">{selectedDetailItem.tglOliMesin || '-'}</p></div><div className="w-px h-8 bg-gray-200"></div><div><p className="text-indigo-500 mb-0.5 font-black uppercase text-[9px]">Jadwal Ganti</p><p className="font-bold text-indigo-700 font-mono">{selectedDetailItem.tglOliMesinNext || '-'}</p></div></div></div><div className="bg-slate-50 p-4 rounded-2xl border border-gray-100 text-xs"><span className="font-black text-gray-400 uppercase block mb-2 tracking-widest">Oli Perseneling</span><div className="flex justify-between text-center"><div><p className="text-gray-400 mb-0.5 font-bold uppercase text-[9px]">Terakhir</p><p className="font-bold font-mono">{selectedDetailItem.tglOliPerseneling || '-'}</p></div><div className="w-px h-8 bg-gray-200"></div><div><p className="text-emerald-500 mb-0.5 font-black uppercase text-[9px]">Jadwal Ganti</p><p className="font-bold text-emerald-700 font-mono">{selectedDetailItem.tglOliPersenelingNext || '-'}</p></div></div></div></div>) : (<div className="bg-slate-50 p-4 rounded-2xl border border-gray-100 min-h-[100px]"><p className="text-xs font-medium text-gray-600 leading-relaxed italic uppercase font-bold">{selectedDetailItem.spek || 'Tidak ada spesifikasi tambahan.'}</p></div>)}</div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm font-medium">
+            <div className="space-y-4"><h4 className="font-black text-gray-400 uppercase tracking-widest flex items-center gap-2 border-b pb-2"><ClipboardList size={16} /> Identitas Fisik</h4><div className="flex justify-between"><span>Kategori</span><span className="font-bold">{selectedDetailItem.kategori}</span></div></div>
+            <div className="space-y-4"><h4 className="font-black text-gray-400 uppercase tracking-widest flex items-center gap-2 border-b pb-2"><Wrench size={16} /> Spesifikasi</h4><div className="p-4 bg-slate-50 rounded-xl italic">{selectedDetailItem.spek || 'Tidak ada info tambahan.'}</div></div>
           </div>
-          {selectedDetailItem.status === 'Dipinjam' && (<div className="bg-orange-50 p-6 rounded-3xl border border-orange-100 animate-in fade-in"><h4 className="text-sm font-black text-orange-700 uppercase tracking-widest mb-3 flex items-center gap-2"><UserCircle size={20} /> Informasi Peminjaman</h4><div className="grid grid-cols-2 gap-4"><div><p className="text-[10px] text-orange-400 font-black uppercase tracking-wider">Nama Peminjam</p><p className="text-orange-900 font-bold text-lg uppercase leading-tight">{selectedDetailItem.peminjam}</p></div><div><p className="text-[10px] text-orange-400 font-black uppercase tracking-wider">Masa Pinjam</p><p className="text-orange-900 font-black text-xs font-mono">{selectedDetailItem.tglPinjam} s/d {selectedDetailItem.tglKembali || '-'}</p></div></div></div>)}
-          {selectedDetailItem.status === 'Rusak' && (<div className="bg-red-50 p-6 rounded-3xl border border-red-100"><h4 className="text-sm font-black text-red-700 uppercase tracking-widest mb-2 flex items-center gap-2"><AlertCircle size={18} /> Catatan Kerusakan</h4><p className="text-red-800 font-medium italic uppercase text-xs leading-relaxed font-bold">"{selectedDetailItem.deskripsiRusak || 'Tidak ada deskripsi detail tersedia.'}"</p></div>)}
         </div>
-        <div className="p-8 border-t border-gray-100 bg-gray-50 flex justify-end"><button onClick={closeDetailModal} className={`${themeColor} text-white px-10 py-4 rounded-[1.8rem] font-black uppercase text-xs tracking-[0.2em] shadow-lg active:scale-95 transition-all`}>Tutup Rincian</button></div>
+        <div className="p-8 border-t border-gray-100 bg-gray-50 flex justify-end"><button onClick={closeDetailModal} className={`${themeColor} text-white px-10 py-4 rounded-[1.8rem] font-black uppercase text-xs shadow-lg`}>Tutup</button></div>
       </div>
     </div>
   );
